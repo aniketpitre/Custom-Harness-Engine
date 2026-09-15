@@ -1,0 +1,16 @@
+environment: development
+domain_default: devops
+cnpg:
+  host: localhost
+  port: 5432
+  database: harness_receipts
+vault:
+  address: http://localhost:8200
+  mount_point: harness-secrets
+telegram:
+  approval_chat_id: null
+model:
+  primary: groq/openai/gpt-oss-120b
+  fallback: groq/compound
+otel:
+  endpoint: http://localhost:4317

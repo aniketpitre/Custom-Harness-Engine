@@ -1,0 +1,50 @@
+services:
+  vault:
+    image: hashicorp/vault:1.20
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_ADDR: http://127.0.0.1:8200
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN_ID:?Set VAULT_DEV_ROOT_TOKEN_ID in .env}
+    command:
+      - server
+      - -dev
+      - -dev-root-token-id=${VAULT_DEV_ROOT_TOKEN_ID:?Set VAULT_DEV_ROOT_TOKEN_ID in .env}
+    ports:
+      - "8200:8200"
+    healthcheck:
+      test: ["CMD-SHELL", "vault status >/dev/null 2>&1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  vault-init:
+    image: hashicorp/vault:1.20
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: http://host.docker.internal:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID:?Set VAULT_DEV_ROOT_TOKEN_ID in .env}
+      GROQ_API_KEY: ${GROQ_API_KEY:?Set GROQ_API_KEY in .env}
+    entrypoint: ["/bin/sh", "/usr/local/bin/init-vault.sh"]
+    volumes:
+      - ./docker/init-vault.sh:/usr/local/bin/init-vault.sh:ro
+
+  harness:
+    build:
+      context: .
+    network_mode: host
+    depends_on:
+      vault-init:
+        condition: service_completed_successfully
+    environment:
+      VAULT_ADDR: http://127.0.0.1:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID:?Set VAULT_DEV_ROOT_TOKEN_ID in .env}
+      VAULT_MOUNT_POINT: harness-secrets
+      HARNESS_MODEL: ${HARNESS_MODEL:-groq/openai/gpt-oss-120b}
+    command: ["python", "-m", "core.gateway.cli", "List the files in the current directory"]
+    restart: "no"

@@ -1,0 +1,136 @@
+import re
+import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+DB_PATH = Path("data/memory.db")
+_FTS_TOKEN = re.compile(r"[A-Za-z0-9_]+")
+_STOP_WORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "is",
+    "of",
+    "the",
+    "to",
+    "what",
+}
+
+
+def init_db(db_path: str | Path = DB_PATH) -> sqlite3.Connection:
+    path = Path(db_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS memory_entries (
+            id TEXT PRIMARY KEY,
+            content TEXT NOT NULL,
+            authorship TEXT NOT NULL CHECK (authorship IN ('human-authored','agent-created')),
+            provenance TEXT NOT NULL CHECK (provenance IN ('user-input','tool-observed','external-fetched','human-reviewed')),
+            domain TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            last_used_at TEXT,
+            use_count INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
+            content,
+            content='memory_entries',
+            content_rowid='rowid'
+        );
+
+        CREATE TRIGGER IF NOT EXISTS memory_entries_ai AFTER INSERT ON memory_entries BEGIN
+            INSERT INTO memory_fts(rowid, content) VALUES (new.rowid, new.content);
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS memory_entries_ad AFTER DELETE ON memory_entries BEGIN
+            INSERT INTO memory_fts(memory_fts, rowid, content) VALUES ('delete', old.rowid, old.content);
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS memory_entries_au AFTER UPDATE OF content ON memory_entries BEGIN
+            INSERT INTO memory_fts(memory_fts, rowid, content) VALUES ('delete', old.rowid, old.content);
+            INSERT INTO memory_fts(rowid, content) VALUES (new.rowid, new.content);
+        END;
+        """
+    )
+    conn.commit()
+    return conn
+
+
+def add_memory(
+    conn: sqlite3.Connection,
+    id_: str,
+    content: str,
+    authorship: str,
+    provenance: str,
+    domain: str,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO memory_entries
+            (id, content, authorship, provenance, domain, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            id_,
+            content,
+            authorship,
+            provenance,
+            domain,
+            datetime.now(timezone.utc).isoformat(),
+        ),
+    )
+    conn.commit()
+
+
+def search_memory(
+    conn: sqlite3.Connection,
+    query: str,
+    domain: str,
+    limit: int = 5,
+) -> list[dict[str, object]]:
+    if limit < 1:
+        return []
+    fts_query = _normalize_fts_query(query)
+    if not fts_query:
+        return []
+
+    rows = conn.execute(
+        """
+        SELECT e.id, e.content, e.authorship, e.provenance
+        FROM memory_fts AS f
+        JOIN memory_entries AS e ON f.rowid = e.rowid
+        WHERE memory_fts MATCH ? AND e.domain = ?
+        ORDER BY rank
+        LIMIT ?
+        """,
+        (fts_query, domain, limit),
+    ).fetchall()
+    now = datetime.now(timezone.utc).isoformat()
+    conn.executemany(
+        """
+        UPDATE memory_entries
+        SET last_used_at = ?, use_count = use_count + 1
+        WHERE id = ?
+        """,
+        [(now, row["id"]) for row in rows],
+    )
+    conn.commit()
+    return [
+        {
+            "id": row["id"],
+            "content": row["content"],
+            "authorship": row["authorship"],
+            "provenance": row["provenance"],
+        }
+        for row in rows
+    ]
+
+
+def _normalize_fts_query(query: str) -> str:
+    tokens = [token for token in _FTS_TOKEN.findall(query.lower()) if token not in _STOP_WORDS]
+    return " OR ".join(f'"{token}"' for token in tokens)

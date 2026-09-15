@@ -1,0 +1,14 @@
+.git
+.venv
+.pytest_cache
+__pycache__
+*.pyc
+*.egg-info/
+data
+secrets
+.env
+.gitignore
+README.md
+general_purpose_agent_harness_architecture.md
+harness-engine-implementation-plan.md
+tests

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "harness-engine"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.6",
+    "claude-agent-sdk",
+    "mcp",
+    "litellm",
+    "python-telegram-bot>=21.0",
+    "kubernetes",
+    "docker",
+    "paramiko",
+    "GitPython",
+    "psycopg[binary]>=3.1",
+    "hvac",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp",
+    "pytest",
+    "pytest-asyncio",
+    "pyyaml",
+]
+
+[tool.setuptools.packages.find]
+include = ["core*", "domains*", "receipts*"]
