@@ -33,13 +33,13 @@ async def handle_cli_input(raw_text: str) -> RunReceipt:
     finally:
         conn.close()
     goal = context.goal
-    result = await run_agent(context, allowed_tools=["Read"])
+    result = await run_agent(context, allowed_tools=["Read", "DevOpsRead"])
     return RunReceipt(
         run_id=str(uuid.uuid4()),
         goal=goal,
         agent_id="default-agent",
         model_used=result["model_used"],
-        actions=[],
+        actions=result["actions"],
         final_text=result["final_text"],
         status="success",
         started_at=goal.created_at,

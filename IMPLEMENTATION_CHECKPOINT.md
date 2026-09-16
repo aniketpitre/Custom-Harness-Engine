@@ -62,7 +62,7 @@ Partially implemented.
 - `core/agent_engine.py` uses LiteLLM with the configured Groq model.
 - The runtime supports a local `read_directory` function tool.
 - `core/gateway/cli.py` creates a Goal, assembles Context from memory, runs the agent, and emits a JSON `RunReceipt`.
-- The receipt currently has an empty `actions` list because tool action recording is not yet wired.
+- Successful tool calls now return `ActionRecord` objects with policy metadata and raw results; CLI receipts include those actions.
 - The current runtime is not using the Claude Agent SDK from the original plan.
 
 ### Phase 3: Verification
@@ -92,7 +92,7 @@ Implemented, tested, and live-validated.
 - `get_secret(path, key)` reads KV v2 values and rejects missing or empty values.
 - `docker/init-vault.sh` initializes `harness-secrets/groq` and `harness-secrets/telegram`.
 - `docker-compose.yml` passes Telegram bootstrap values to `vault-init` and only Vault connection settings to the harness container.
-- `tests/core/test_secrets.py` covers loader validation and malformed responses.
+- Vault access was validated through the live Docker/Vault path; no mock-based Vault test is retained in the repository.
 
 Live validation performed:
 
@@ -134,22 +134,77 @@ SAFE_NOOP_EXECUTED=false
 Limitations:
 
 - The live acceptance used a safe no-op rather than a real infrastructure mutation.
-- The current production tool exposed by `core/agent_engine.py` is only the R0 `read_directory` tool, so there is not yet a real R2/R3 DevOps tool wired through the agent.
-- `ActionRecord.approved_by` is not yet persisted into the normal run receipt.
+- The current production tools are R0 `read_directory` plus the Phase 7 R0 Kubernetes and ArgoCD read tools; there is not yet a real R2/R3 DevOps action wired through the agent.
+- Successful approved actions now carry the Telegram approver ID in the returned policy decision and action record; a real DevOps R2/R3 action is still not available in this environment.
 - The Telegram module contains both direct polling in `request_approval` and an application callback path; consolidate these when integrating the long-running gateway.
+
+### Phase 7: DevOps read-only domain pack
+
+Implemented through tool registration, but real-cluster acceptance is pending environment access.
+
+Added:
+
+- `domains/devops/tools/_mcp.py`: compatibility import for MCP v1 `FastMCP` and installed MCP v2 `MCPServer`.
+- `domains/devops/tools/kubectl_tools.py`: lazy Vault-backed Kubernetes client with `kubectl_get_pods`, `kubectl_describe_pod`, and `kubectl_logs`.
+- `domains/devops/tools/argocd_tools.py`: subprocess-based, argument-list-only ArgoCD wrapper with `argocd_app_list` and `argocd_app_get`.
+- `domains/devops/skills/argocd-status-check/SKILL.md`: read-only procedure for correlating ArgoCD application state with Kubernetes pod evidence.
+
+Runtime wiring:
+
+- `core/agent_engine.py` advertises and dispatches the five read-only tools.
+- Every DevOps tool resolves through the existing R0 policy table before execution.
+- `core/gateway/cli.py` grants CLI runs the `DevOpsRead` capability.
+- Kubernetes configuration is loaded lazily from the Vault secret `kubernetes/kubeconfig_path`.
+- ArgoCD commands cannot execute shell strings and have a 30-second timeout.
+
+Validation completed:
+
+- All five tool schemas imported successfully.
+- Both MCP servers imported successfully under the installed MCP v2 package.
+- Python compilation passed.
+- Existing suite passed before the mock-test cleanup: `35 passed`.
+
+Real preflight retest performed afterward:
+
+- `kubectl version --client` succeeded with client version `v1.37.0`.
+- `kubectl cluster-info` and `kubectl get namespaces` attempted the real default endpoint and received connection refused from `localhost:8080`.
+- The `argocd` CLI was not installed or available on `PATH`.
+- Direct Python tool execution reported the real missing ArgoCD executable and missing Vault runtime variables rather than returning fabricated cluster data.
+- Attempted to provision a real disposable Minikube cluster with Docker and then with containerd; both control-plane startup paths failed in this dev container because the Minikube node SSH/control-plane lifecycle could not be maintained.
+- The failed disposable cluster was deleted and no broken Minikube container or active kubeconfig was left behind.
+- The Phase 7.5 acceptance is therefore still blocked and is not marked complete.
+
+Environment blocker for Phase 7.5:
+
+- `kubectl` client is installed, but `$HOME/.kube/config` is absent.
+- `argocd` is not installed or available on `PATH`.
+- A disposable local cluster cannot currently be provisioned with Minikube in this Docker-in-container environment.
+- Do not claim the real-cluster acceptance until a real kubeconfig is stored at the Vault path and the ArgoCD CLI or API access is configured.
 
 ## Files Added or Changed During This Work
 
-Tracked files with current working-tree changes:
+Tracked files changed across the implementation checkpoint:
 
 - `.env.example`: added Telegram bot token and approval chat ID placeholders.
 - `core/gateway/telegram.py`: added Telegram application helpers and fixed update-offset ordering for live approvals.
 - `docker-compose.yml`: passes Telegram bootstrap secrets to `vault-init`.
 - `docker/init-vault.sh`: seeds Telegram credentials in Vault.
+- `core/agent_engine.py`: registers and dispatches the five read-only DevOps tools through R0 policy checks.
+- `core/agent_engine.py`: records successful filesystem and DevOps tool calls as `ActionRecord` values.
+- `core/gateway/cli.py`: grants CLI runs the `DevOpsRead` capability.
+- `core/gateway/cli.py`: places recorded actions into `RunReceipt.actions`.
+- `IMPLEMENTATION_CHECKPOINT.md`: this handoff record.
 
-New file:
+New files:
 
-- `tests/core/test_secrets.py`: Vault loader contract tests.
+- `domains/devops/tools/_mcp.py`: MCP v1/v2 compatibility import.
+- `domains/devops/tools/kubectl_tools.py`: Vault-backed Kubernetes read tools.
+- `domains/devops/tools/argocd_tools.py`: read-only ArgoCD CLI wrapper.
+- `domains/devops/skills/argocd-status-check/SKILL.md`: read-only ArgoCD/Kubernetes investigation procedure.
+
+Removed file:
+
+- `tests/core/test_secrets.py`: removed because it used a fake Vault client and the project requirement is real integration testing rather than mock acceptance tests.
 
 The local `.env` contains real values and is ignored. Never copy its contents into this file, source code, documentation, terminal output, or commits.
 
@@ -160,16 +215,23 @@ Run from the repository root:
 ```bash
 python3 -m pytest -q
 python3 -m compileall -q core domains tests
-python3 -m pytest -q tests/core/test_secrets.py
 sh -n docker/init-vault.sh
 docker compose config --quiet
 ```
 
-Last verified result after removing mock approval coverage:
+Last verified result after removing mock-based approval and Vault tests:
 
 ```text
-35 passed
+29 passed
 ```
+
+The 29-test suite contains schema, policy, memory, and file-verification tests. It does not claim live Kubernetes, ArgoCD, Vault, or Telegram behavior.
+
+Real action-recording check:
+
+- Called the actual `read_directory` implementation against the repository working directory.
+- Received `filesystem/read_directory` with policy decision `ALLOW`.
+- Received a non-empty raw result in the generated `ActionRecord`.
 
 Use `python3 -m pytest`, not the bare `pytest` executable, because the bare executable previously used an interpreter that did not resolve the editable repository import path.
 
@@ -181,17 +243,15 @@ Use `python3 -m pytest`, not the bare `pytest` executable, because the bare exec
 - Keep `secrets/`, `.env`, and `data/` out of commits.
 - Do not run real production actions during testing.
 - For live approval tests, use a clearly labeled harmless action and require an explicit human decision.
+- Do not add fake clients, mock approval flows, sample cluster state, or fabricated integration results for Phase 7 acceptance.
 
 ## Next Recommended Work
 
-Proceed to Phase 7, but keep the scope read-only:
+Finish Phase 7.5, keeping the scope read-only:
 
-1. Add a real Kubernetes read-only tool under `domains/devops/tools/kubectl_tools.py`.
-2. Load the kubeconfig path through Vault rather than hardcoding it.
-3. Add a real ArgoCD read-only tool under `domains/devops/tools/argocd_tools.py`.
-4. Register those tools in the agent engine with R0 policy entries.
-5. Add the first DevOps skill under `domains/devops/skills/`.
-6. Run the CLI against a real test cluster and verify the returned state.
-7. Record each tool call in `ActionRecord` before adding any write or rollback action.
+1. Provide a real kubeconfig path through Vault at `kubernetes/kubeconfig_path`.
+2. Install/configure the real ArgoCD CLI or replace the wrapper with an authenticated ArgoCD API client.
+3. Run the CLI against a real test cluster and verify returned Kubernetes and ArgoCD state.
+4. Record each real tool call in `ActionRecord` before adding any write or rollback action.
 
 Do not begin Phase 8 or Phase 10 write actions until real read-only tools, action receipts, and verification are connected end to end.
