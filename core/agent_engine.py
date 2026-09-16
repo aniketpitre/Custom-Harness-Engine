@@ -11,12 +11,17 @@ from core.gateway.telegram import get_approver, request_approval
 from core.primitives.policy import PolicyDecision, resolve_policy
 from core.primitives.context import ContextPacket
 from core.primitives.execution import ActionRecord
+from core.primitives.verification import VerificationResult
+from core.verification import verify_file_content
+from core.snapshots import execute_with_snapshot
 from domains.devops.tools.argocd_tools import argocd_app_get, argocd_app_list
 from domains.devops.tools.kubectl_tools import (
     kubectl_describe_pod,
     kubectl_get_pods,
     kubectl_logs,
+    kubectl_restart_pod,
 )
+from domains.devops.snapshots import pod_snapshot, pod_snapshot_after_restart
 from domains.devops.policy_table import TOOL_RISK_TABLE
 
 
@@ -109,6 +114,25 @@ DEVOPS_READ_TOOLS = [
     },
 ]
 
+DEVOPS_ACTION_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "kubectl_restart_pod",
+            "description": "Restart a non-critical Kubernetes pod by deleting it so its controller recreates it. Requires human approval.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "namespace": {"type": "string"},
+                    "pod_name": {"type": "string"},
+                },
+                "required": ["namespace", "pod_name"],
+                "additionalProperties": False,
+            },
+        },
+    },
+]
+
 
 async def run_agent(context: ContextPacket, allowed_tools: list[str]) -> dict[str, Any]:
     model = os.getenv("HARNESS_MODEL") or os.getenv("GROK_MODEL") or "groq/openai/gpt-oss-120b"
@@ -123,10 +147,12 @@ async def run_agent(context: ContextPacket, allowed_tools: list[str]) -> dict[st
     tools = [READ_DIRECTORY_TOOL] if "Read" in allowed_tools else []
     if "DevOpsRead" in allowed_tools:
         tools.extend(DEVOPS_READ_TOOLS)
+    if "DevOpsWrite" in allowed_tools:
+        tools.extend(DEVOPS_ACTION_TOOLS)
     events: list[Any] = []
     actions: list[ActionRecord] = []
 
-    for _ in range(4):
+    for _ in range(8):
         response = await litellm.acompletion(
             model=model,
             api_key=api_key,
@@ -143,6 +169,7 @@ async def run_agent(context: ContextPacket, allowed_tools: list[str]) -> dict[st
                 "final_text": getattr(message, "content", None) or "",
                 "model_used": model,
                 "actions": actions,
+                "verification": _run_requested_verification(context),
             }
 
         messages.append(_assistant_message(message, tool_calls))
@@ -163,7 +190,7 @@ async def run_agent(context: ContextPacket, allowed_tools: list[str]) -> dict[st
                 }
             )
 
-    raise RuntimeError("Grok exceeded the maximum number of tool turns")
+    raise RuntimeError("Grok exceeded the maximum number of tool turns (8)")
 
 
 def _build_prompt(context: ContextPacket) -> str:
@@ -203,6 +230,39 @@ async def _dispatch_tool(
             raise PermissionError(f"Tool is not allowed: {name}")
         result, policy_decision = _dispatch_devops_read_tool(name, arguments)
         return result, _action_record(policy_decision, result)
+    if name == "kubectl_restart_pod":
+        if "DevOpsWrite" not in allowed_tools:
+            raise PermissionError(f"Tool is not allowed: {name}")
+        policy_decision = resolve_policy("kubectl", "restart_pod", TOOL_RISK_TABLE)
+        if policy_decision.decision == "DENY":
+            raise PermissionError(policy_decision.reason)
+        if policy_decision.decision == "REQUIRE_APPROVAL":
+            approved = await request_approval(
+                action_id=action_id,
+                description=f"kubectl.restart_pod {arguments['namespace']}/{arguments['pod_name']}",
+                risk_tier=policy_decision.risk_tier,
+            )
+            if not approved:
+                raise PermissionError("Human approval denied this action")
+            policy_decision = PolicyDecision.model_validate(
+                policy_decision.model_copy(
+                    update={"decision": "ALLOW", "approved_by": get_approver(action_id)}
+                )
+            )
+        result, pre_state, post_state = await execute_with_snapshot(
+            kubectl_restart_pod,
+            pod_snapshot,
+            pod_snapshot_after_restart,
+            arguments["namespace"],
+            arguments["pod_name"],
+        )
+        return result, _action_record(
+            policy_decision,
+            result,
+            pre_state_snapshot=pre_state,
+            post_state_snapshot=post_state,
+            rollback_available=True,
+        )
     if name != "read_directory" or "Read" not in allowed_tools:
         raise PermissionError(f"Tool is not allowed: {name}")
     policy_decision = resolve_policy("filesystem", name, TOOL_RISK_TABLE)
@@ -230,31 +290,36 @@ def _dispatch_devops_read_tool(
 ) -> tuple[str, PolicyDecision]:
     if name == "kubectl_get_pods":
         tool, action = "kubectl", "get"
-        result = kubectl_get_pods(arguments["namespace"])
+        execute = lambda: kubectl_get_pods(arguments["namespace"])
     elif name == "kubectl_describe_pod":
         tool, action = "kubectl", "describe"
-        result = kubectl_describe_pod(arguments["namespace"], arguments["pod_name"])
+        execute = lambda: kubectl_describe_pod(arguments["namespace"], arguments["pod_name"])
     elif name == "kubectl_logs":
         tool, action = "kubectl", "logs"
-        result = kubectl_logs(
-            arguments["namespace"],
-            arguments["pod_name"],
-            arguments.get("container"),
+        execute = lambda: kubectl_logs(
+            arguments["namespace"], arguments["pod_name"], arguments.get("container")
         )
     elif name == "argocd_app_list":
         tool, action = "argocd", "app_list"
-        result = argocd_app_list()
+        execute = argocd_app_list
     else:
         tool, action = "argocd", "app_get"
-        result = argocd_app_get(arguments["app_name"])
+        execute = lambda: argocd_app_get(arguments["app_name"])
 
     policy_decision = resolve_policy(tool, action, TOOL_RISK_TABLE)
     if policy_decision.decision != "ALLOW":
         raise PermissionError(policy_decision.reason)
-    return result, policy_decision
+    return execute(), policy_decision
 
 
-def _action_record(policy_decision: PolicyDecision, raw_result: str) -> ActionRecord:
+def _action_record(
+    policy_decision: PolicyDecision,
+    raw_result: str,
+    *,
+    pre_state_snapshot: dict[str, object] | None = None,
+    post_state_snapshot: dict[str, object] | None = None,
+    rollback_available: bool = False,
+) -> ActionRecord:
     now = datetime.now(timezone.utc)
     return ActionRecord(
         tool=policy_decision.tool,
@@ -264,7 +329,21 @@ def _action_record(policy_decision: PolicyDecision, raw_result: str) -> ActionRe
         started_at=now,
         finished_at=now,
         raw_result=raw_result,
+        pre_state_snapshot=pre_state_snapshot,
+        post_state_snapshot=post_state_snapshot,
+        rollback_available=rollback_available,
     )
+
+
+def _run_requested_verification(context: ContextPacket) -> VerificationResult | None:
+    request = context.live_state.get("verification")
+    if not isinstance(request, dict):
+        return None
+    path = request.get("path")
+    expected_content = request.get("expected_content")
+    if not isinstance(path, str) or not isinstance(expected_content, str):
+        raise ValueError("Verification requires string path and expected_content")
+    return verify_file_content(path, expected_content)
 
 
 def _read_directory(path: str) -> str:

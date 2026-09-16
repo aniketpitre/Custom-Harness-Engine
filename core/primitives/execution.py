@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.primitives.goal import Goal
+from core.primitives.learning import CandidateSkill
 from core.primitives.policy import PolicyDecision
 from core.primitives.verification import VerificationResult
 
@@ -31,6 +32,7 @@ class RunReceipt(BaseModel):
     model_used: str = Field(min_length=1)
     actions: list[ActionRecord] = Field(default_factory=list)
     verification: VerificationResult | None = None
+    candidate_skill: CandidateSkill | None = None
     final_text: str | None = None
     status: str = Field(pattern="^(running|success|failure|blocked)$", default="running")
     started_at: datetime

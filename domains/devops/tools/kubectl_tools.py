@@ -50,5 +50,15 @@ def kubectl_logs(namespace: str, pod_name: str, container: str | None = None) ->
     return _get_core_v1().read_namespaced_pod_log(**kwargs)
 
 
+def kubectl_restart_pod(namespace: str, pod_name: str) -> str:
+    """Mutating R2 action: delete a pod so its controller recreates it."""
+    response = _get_core_v1().delete_namespaced_pod(
+        name=pod_name,
+        namespace=namespace,
+        body=client.V1DeleteOptions(grace_period_seconds=30),
+    )
+    return json.dumps(response.to_dict(), default=str, sort_keys=True)
+
+
 if __name__ == "__main__":
     mcp.run()
