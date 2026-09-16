@@ -30,6 +30,8 @@ services:
       VAULT_ADDR: http://host.docker.internal:8200
       VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID:?Set VAULT_DEV_ROOT_TOKEN_ID in .env}
       GROQ_API_KEY: ${GROQ_API_KEY:?Set GROQ_API_KEY in .env}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN in .env}
+      TELEGRAM_APPROVAL_CHAT_ID: ${TELEGRAM_APPROVAL_CHAT_ID:?Set TELEGRAM_APPROVAL_CHAT_ID in .env}
     entrypoint: ["/bin/sh", "/usr/local/bin/init-vault.sh"]
     volumes:
       - ./docker/init-vault.sh:/usr/local/bin/init-vault.sh:ro
