@@ -26,7 +26,7 @@ async def test_live_pr():
         id=f"scenario-gitops-{branch_id}",
         source=TriggerSource.cli,
         raw_input=f"You MUST invoke 'gitops_propose_change' to append 'Phase 10 tested' to a new file 'docs/phase10_test_{branch_id}.md' using branch '{new_branch_name}'. Use repository path '.', commit message 'test: live phase 10', PR title 'test: phase 10 live gitops validation', and PR body 'Validation PR for GitOps pipeline'. MUST call the tool immediately.",
-        domain="devops"
+        domain="devops", created_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc)
     )
 
     context = ContextPacket(
