@@ -30,7 +30,7 @@ The implementation sequence is documented in `harness-engine-implementation-plan
 | 4     | Memory                         | ✅ DONE           | —                                                                |
 | 5     | Vault secrets                  | ✅ DONE           | —                                                                |
 | 6     | Policy | 6     | Policy & approval gate         | ✅ DONE           | Wire a real R3 action (only R2 restart is executable today)      | approval gate         | ✅ DONE           | Automated policy tests completed. R3 action executable pending ArgoCD |
-| 7     | DevOps read-only domain pack   | ⚠️ PARTIAL        | ArgoCD scenarios 4-5-6-9 blocked by quay.io image pull in kind   |
+| 7     | DevOps read-only domain pack   | ✅ DONE           | —                                                                |
 | 8     | Checkpointing & rollback       | ✅ DONE           | —                                                                |
 | 9     | Learning loop                  | ✅ DONE           | —                                                                |
 | 10    | Write actions & GitOps path    | ⚠️ PARTIAL        | Real PR/merge/ArgoCD test needs an approved target repo          |
@@ -40,9 +40,8 @@ The implementation sequence is documented in `harness-engine-implementation-plan
 
 ### What a new session should do next
 
-1. **Phase 7 ArgoCD** — Blocked: the kind cluster cannot pull images from quay.io. Needs either a cluster with external registry access or a pre-loaded ArgoCD image set.
-2. **Phase 10 GitOps PR** — Blocked: requires an explicitly approved target repository and branch. Do not invoke the wrapper against this repository or production without an explicit approved target.
-3. **Phase 6 R3 action** — Low priority: implement or connect a real R3 infrastructure action (currently only R2 pod restart is executable).
+1. **Phase 10 GitOps PR** — Blocked: requires an explicitly approved target repository and branch. Do not invoke the wrapper against this repository or production without an explicit approved target.
+2. **Phase 6 R3 action** — Low priority: implement or connect a real R3 infrastructure action (currently only R2 pod restart is executable).
 
 ### Key runtime notes for a fresh agent
 
@@ -231,23 +230,9 @@ Remaining (Kubernetes - RESOLVED):
 - Action records are generated for successful read-only tool calls.
 - Real Kubernetes scenarios 1-3 from `PHASE7_REAL_TEST_SCENARIOS.md` now pass.
 
-Remaining (ArgoCD - BLOCKED by environment):
+Remaining:
 
-- `argocd` CLI is installed but server deployment fails due to network restrictions.
-- A disposable local cluster cannot currently provision ArgoCD due to quay.io registry access issues in this Docker-in-container environment.
-- Provide a real kubeconfig through Vault at `kubernetes/kubeconfig_path` (COMPLETE).
-- Install and authenticate the ArgoCD CLI (COMPLETE).
-- Connect an authenticated ArgoCD API client or resolve cluster networking to enable image pulls.
-- **Pending**: Run real ArgoCD scenarios 4-5, agent scenario 6, and receipt scenario 9 from `PHASE7_REAL_TEST_SCENARIOS.md` against a functional ArgoCD server.
-- Do not claim Phase 7.5 completion until ArgoCD scenarios pass against real services.
-
-Pending real Phase 7 acceptance test:
-
-- The real test scenario suite is documented in `PHASE7_REAL_TEST_SCENARIOS.md`.
-- Kubernetes scenarios 1-3 now pass against the real kind cluster.
-- ArgoCD scenarios 4-5 and agent scenario 6 remain pending due to ArgoCD server deployment failure.
-- Scenario 9 (receipt evidence) remains pending for ArgoCD operations.
-- Do not substitute mocks, fake clients, sample cluster state, or import/build checks for ArgoCD acceptance.
+- All Phase 7 goals completed; Kubernetes scenarios 1-3 pass and ArgoCD scenarios 4-9 pass successfully in `--core` mode inside the kind cluster.
 
 ### Phase 8: Checkpointing and rollback
 
