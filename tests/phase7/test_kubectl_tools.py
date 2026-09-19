@@ -40,10 +40,8 @@ async def test_kubectl_tools():
     
     # Run the agent with DevOps read tools allowed
     result = await run_agent(context, allowed_tools=[
-        "read_directory", 
-        "kubectl_get_pods",
-        "kubectl_describe_pod", 
-        "kubectl_logs"
+        "Read",
+        "DevOpsRead"
     ])
     
     print("Agent result:")
