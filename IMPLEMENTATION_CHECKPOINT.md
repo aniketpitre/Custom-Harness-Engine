@@ -311,3 +311,17 @@ Completed:
 - Telemetry captures the primary `harness_agent_run` bounding traces spanning LLM execution.
 - Telemetry dynamically annotates `resolve_policy` hooks across action tiers.
 - A standard Grafana dashboard definition is deployed into `config/dashboard.json`.
+
+### Phase 12: Orchestration layer
+Implementation complete, live test run pending.
+- `core/primitives/orchestration.py` implemented `OrchestrationPlan`, `Phase`, and `SubagentSpec`.
+- `core/orchestration/executor.py` logic added for fanning out Phase jobs and checkpoint/resume behavior.
+- Convergence and checkpoints supported via SQLite `workflow_checkpoints` injected into `core/memory/store.py`.
+- Final real test case workflow script added at `core/gateway/workflow.py` for "Adversarial cross-check" (live network tests not yet executed).
+
+### Phase 13: Hardening
+Implementation complete in code.
+- 13.1 Sandbox configuration: Path boundaries implemented in read_directory to deny access to .ssh, .aws, .kube and secrets.
+- 13.2 Durable independently queryable child runs: Implemented natively via `workflow_checkpoints` integration into SQLite.
+- 13.3 Automated rollback on detected violation: Integrated anomaly validation in Agent Engine catching `kube-system` mutations and immediately initiating snapshot rollback without a human gate.
+- 13.4 Static analysis on candidate skills: Embedded RegEx payload screening (blocking URLs, credentials, test disabling flags) in candidate skill promotion before telegram triggers.

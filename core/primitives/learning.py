@@ -104,6 +104,18 @@ def write_skill_to_registry(candidate: CandidateSkill, registry_root: str | Path
 
 
 async def promote_candidate_skill(candidate: CandidateSkill, registry_root: str | Path = "domains/devops/skills") -> CandidateSkill:
+    # Phase 13.4 Static Analysis: Reject suspicious patterns automatically
+    suspicious_patterns = [
+        r"http[s]?://",
+        r"password\s*=.*|secret\s*=",
+        r"disable[-_]check",
+        r"--no-verify",
+    ]
+    for pattern in suspicious_patterns:
+        if re.search(pattern, candidate.proposed_body, re.IGNORECASE):
+            candidate.transition_to(CandidateSkillStatus.rejected)
+            return candidate
+
     from core.gateway.telegram import request_approval
 
     approved = await request_approval(

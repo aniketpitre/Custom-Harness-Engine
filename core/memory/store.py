@@ -55,6 +55,15 @@ def init_db(db_path: str | Path = DB_PATH) -> sqlite3.Connection:
             INSERT INTO memory_fts(memory_fts, rowid, content) VALUES ('delete', old.rowid, old.content);
             INSERT INTO memory_fts(rowid, content) VALUES (new.rowid, new.content);
         END;
+
+        CREATE TABLE IF NOT EXISTS workflow_checkpoints (
+            workflow_id TEXT,
+            phase_index INTEGER,
+            status TEXT,
+            result_json TEXT,
+            updated_at TEXT,
+            PRIMARY KEY (workflow_id, phase_index)
+        );
         """
     )
     conn.commit()
@@ -134,3 +143,31 @@ def search_memory(
 def _normalize_fts_query(query: str) -> str:
     tokens = [token for token in _FTS_TOKEN.findall(query.lower()) if token not in _STOP_WORDS]
     return " OR ".join(f'"{token}"' for token in tokens)
+import json
+
+def get_workflow_checkpoint(conn: sqlite3.Connection, workflow_id: str, phase_index: int) -> dict | None:
+    row = conn.execute(
+        "SELECT status, result_json FROM workflow_checkpoints WHERE workflow_id = ? AND phase_index = ?",
+        (workflow_id, phase_index)
+    ).fetchone()
+    if row:
+        return {
+            "status": row["status"],
+            "result_json": json.loads(row["result_json"]) if row["result_json"] else None
+        }
+    return None
+
+def save_workflow_checkpoint(conn: sqlite3.Connection, workflow_id: str, phase_index: int, status: str, result_json: dict | list | None = None) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        """
+        INSERT INTO workflow_checkpoints (workflow_id, phase_index, status, result_json, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(workflow_id, phase_index) DO UPDATE SET
+            status=excluded.status,
+            result_json=excluded.result_json,
+            updated_at=excluded.updated_at
+        """,
+        (workflow_id, phase_index, status, json.dumps(result_json) if result_json else None, now)
+    )
+    conn.commit()

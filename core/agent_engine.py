@@ -345,6 +345,16 @@ async def _dispatch_tool(
             arguments["namespace"],
             arguments["pod_name"],
         )
+
+        # Phase 13.3: Automated anomaly check and rollback wrapper
+        if arguments.get("namespace") == "kube-system":
+            try:
+                from domains.devops.snapshots import rollback_pod_restart
+                rollback_pod_restart(arguments["namespace"], arguments["pod_name"], pre_state)
+            except Exception as e:
+                pass
+            raise PermissionError("Rollback triggered automatically (Phase 13.3): action targeted protected namespace 'kube-system'")
+
         return result, _action_record(
             policy_decision,
             result,
@@ -438,6 +448,13 @@ def _run_requested_verification(context: ContextPacket) -> VerificationResult | 
 def _read_directory(path: str) -> str:
     working_directory = Path.cwd().resolve()
     directory = (working_directory / path).resolve()
+
+    # Phase 13.1 Sandbox Policy: Deny sensitive directories globally
+    deny_patterns = {".ssh", ".aws", ".kube", "secrets"}
+    for part in directory.parts:
+        if part in deny_patterns:
+            raise PermissionError(f"Sandbox violation: Access to '{part}' is restricted.")
+
     try:
         directory.relative_to(working_directory)
     except ValueError as error:
