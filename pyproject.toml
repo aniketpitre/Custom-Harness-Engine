@@ -17,6 +17,8 @@ dependencies = [
     "hvac",
     "opentelemetry-sdk",
     "opentelemetry-exporter-otlp",
+    "fastapi",
+    "uvicorn",
     "pytest",
     "pytest-asyncio",
     "pyyaml",

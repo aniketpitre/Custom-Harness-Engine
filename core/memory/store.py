@@ -56,6 +56,17 @@ def init_db(db_path: str | Path = DB_PATH) -> sqlite3.Connection:
             INSERT INTO memory_fts(rowid, content) VALUES (new.rowid, new.content);
         END;
 
+        
+        CREATE TABLE IF NOT EXISTS sessions (
+            id TEXT PRIMARY KEY,
+            agent_id TEXT NOT NULL,
+            goal TEXT NOT NULL,
+            status TEXT NOT NULL,
+            environment JSON,
+            run_receipt JSON,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS workflow_checkpoints (
             workflow_id TEXT,
             phase_index INTEGER,
@@ -169,5 +180,44 @@ def save_workflow_checkpoint(conn: sqlite3.Connection, workflow_id: str, phase_i
             updated_at=excluded.updated_at
         """,
         (workflow_id, phase_index, status, json.dumps(result_json) if result_json else None, now)
+    )
+    conn.commit()
+
+
+def create_session(conn: sqlite3.Connection, session_id: str, agent_id: str, goal: str, environment: dict = None) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        '''
+        INSERT INTO sessions (id, agent_id, goal, status, environment, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''',
+        (session_id, agent_id, goal, "pending", json.dumps(environment or {}), now, now)
+    )
+    conn.commit()
+
+def get_session(conn: sqlite3.Connection, session_id: str) -> dict | None:
+    row = conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
+    if row:
+        return {
+            "id": row["id"],
+            "agent_id": row["agent_id"],
+            "goal": row["goal"],
+            "status": row["status"],
+            "environment": json.loads(row["environment"]) if row["environment"] else {},
+            "run_receipt": json.loads(row["run_receipt"]) if row["run_receipt"] else None,
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"]
+        }
+    return None
+
+def update_session(conn: sqlite3.Connection, session_id: str, status: str, run_receipt: dict | None = None) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        '''
+        UPDATE sessions
+        SET status = ?, run_receipt = ?, updated_at = ?
+        WHERE id = ?
+        ''',
+        (status, json.dumps(run_receipt) if run_receipt else None, now, session_id)
     )
     conn.commit()

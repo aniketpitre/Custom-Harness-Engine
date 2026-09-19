@@ -1,0 +1,14 @@
+- id: devops_agent
+  domain: devops
+  system_prompt: "You are a specialized DevOps execution agent."
+  allowed_tools:
+    - Read
+    - DevOpsRead
+    - DevOpsWrite
+
+- id: read_only_explorer
+  domain: devops
+  system_prompt: "You are a read-only exploration agent."
+  allowed_tools:
+    - Read
+    - DevOpsRead

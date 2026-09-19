@@ -194,17 +194,20 @@ DEVOPS_ACTION_TOOLS = [
 ]
 
 
-async def run_agent(context: ContextPacket, allowed_tools: list[str]) -> dict[str, Any]:
+from core.primitives.agent import AgentProfile
+
+async def run_agent(context: ContextPacket, allowed_tools: list[str], agent_profile: AgentProfile | None = None) -> dict[str, Any]:
     with tracer.start_as_current_span("harness_agent_run") as span:
         span.set_attribute("agent.goal", context.goal.raw_input)
         span.set_attribute("agent.domain", context.goal.domain)
         span.set_attribute("agent.trigger_source", context.goal.source.value)
-        model = os.getenv("HARNESS_MODEL") or os.getenv("GROK_MODEL") or "groq/openai/gpt-oss-120b"
+        model = (agent_profile.model if agent_profile and agent_profile.model else None) or os.getenv("HARNESS_MODEL") or os.getenv("GROK_MODEL") or "groq/openai/gpt-oss-120b"
         api_key = get_secret("groq", "api_key")
+        sys_prompt = agent_profile.system_prompt if agent_profile else "You are an execution agent. Use available tools when they provide direct evidence for the goal."
         messages: list[dict[str, Any]] = [
             {
                 "role": "system",
-                "content": "You are an execution agent. Use available tools when they provide direct evidence for the goal.",
+                "content": sys_prompt,
             },
             {"role": "user", "content": _build_prompt(context)},
         ]
