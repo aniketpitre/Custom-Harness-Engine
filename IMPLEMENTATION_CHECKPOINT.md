@@ -19,7 +19,7 @@ The implementation sequence is documented in `harness-engine-implementation-plan
 
 ## Quick Status (2026-09-19)
 
-**Test suite: 34 passed, 0 failed** (`python3 -m pytest tests/ -v`)
+**Test suite: 52 passed, 0 failed** (`python3 -m pytest tests/ -v`)
 
 | Phase | Name                           | Status           | Remaining                                                        |
 |-------|--------------------------------|------------------|------------------------------------------------------------------|
@@ -29,7 +29,7 @@ The implementation sequence is documented in `harness-engine-implementation-plan
 | 3     | Verification                   | ✅ DONE           | —                                                                |
 | 4     | Memory                         | ✅ DONE           | —                                                                |
 | 5     | Vault secrets                  | ✅ DONE           | —                                                                |
-| 6     | Policy | 6     | Policy & approval gate         | ✅ DONE           | Wire a real R3 action (only R2 restart is executable today)      | approval gate         | ✅ DONE           | Automated policy tests completed. R3 action executable pending ArgoCD |
+| 6     | Policy & approval gate         | ✅ DONE           | —                                                                |
 | 7     | DevOps read-only domain pack   | ✅ DONE           | —                                                                |
 | 8     | Checkpointing & rollback       | ✅ DONE           | —                                                                |
 | 9     | Learning loop                  | ✅ DONE           | —                                                                |
