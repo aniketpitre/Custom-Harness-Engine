@@ -37,10 +37,14 @@ The implementation sequence is documented in `harness-engine-implementation-plan
 | 11    | Observability                  | ✅ DONE           | —                                                                |
 | 12    | Orchestration layer            | ✅ DONE           | —                                                                |
 | 13    | Hardening                      | ✅ DONE (in code) | —                                                                |
+| 14    | Unified Control Plane & API    | ⏳ PENDING        | Implement Declarative Agent Registry, Durable Sessions, REST API |
+| 15    | Event Streaming & Interactive  | ⏳ PENDING        | Implement SSE capability and mid-task user.interrupt steering    |
+| 16    | Context & Execution Hardening  | ⏳ PENDING        | Implement large output spilling, budgets, generic tool expansion |
+| 17    | Background Infrastructure      | ⏳ PENDING        | Implement APScheduler cron, Memory dreaming, Advisor sub-model   |
 
 ### What a new session should do next
 
-The codebase and all 14 phases (0-13) are now fully tested and verified ✅. No further implementation steps are blocked. The core framework is ready for production scaling.
+The codebase for the initial Data Plane (Phases 0-13) is fully tested and verified ✅. The next step is to implement the Control Plane features (Phases 14-17) to reach full architectural parity with Claude Managed Agents.
 
 ### Key runtime notes for a fresh agent
 

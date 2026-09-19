@@ -687,7 +687,62 @@ Acceptance for the whole phase: deliberately attempt an out-of-scope action in a
 
 ---
 
-## Final acceptance — the system is "done" for v1 when
+
+## Phase 14 — Unified Control Plane & API Constructs
+
+*This phase evolves the Harness from a localized data-plane script into an independent, API-driven backend.*
+
+### Step 14.1 — Declarative Agent Registry
+Implement YAML-based Agent Definitions (e.g., `agents/sre-agent.yaml`) that decouple agent profiles from the engine. This replaces hardcoded `DEVOPS_READ_TOOLS` with dynamic tool/model configurations.
+
+### Step 14.2 — Durable Session Management
+Refactor `RunReceipt` logic into a long-lived `Session` entity stored in the database. A session binds an Agent, an Environment, and a Task, persisting across HTTP requests.
+
+### Step 14.3 — REST API Gateway
+Build a FastAPI layer with explicit endpoints to create sessions, list agents, and post initial events, replacing the CLI entry point as the primary interface.
+
+---
+
+## Phase 15 — Event Streaming & Iterative Interactivity
+
+### Step 15.1 — Server-Sent Events (SSE)
+Refactor the `for _ in range(8):` blocking loop in `agent_engine.py` into an async generator. Yield `agent.message`, `agent.tool_use`, and `session.status_idle` dynamically to the client over an SSE connection.
+
+### Step 15.2 — Mid-Task Steering (Interruptions)
+Implement a listener thread or DB flag allowing a `user.interrupt` or `user.message` HTTP call to inject steering text directly into an active, running session's context, or gracefully halt it mid-tool.
+
+---
+
+## Phase 16 — Context & Execution Hardening
+
+### Step 16.1 — Large Output Spilling
+Implement an automatic truncation boundary (e.g., 100,000 characters). When a tool like `kubectl logs` exceeds this, automatically write the output to a safe sandbox file and return only a truncated preview + filepath back to the LLM context.
+
+### Step 16.2 — Token & Cost Budgets
+Replace the static 8-turn counter with a hard budget model. Track token usage limits per `Session` via LiteLLM token counting, forcefully returning `budget_reached` upon constraint breach.
+
+### Step 16.3 — Standard Generic Toolset 
+Build capabilities native to pure file and web interaction independent of DevOps: `grep`, `glob`, `edit`, `web_search`, and `web_fetch`.
+
+---
+
+## Phase 17 — Background Infrastructure Support
+
+### Step 17.1 — Scheduled Agents
+Introduce a background scheduler (e.g., APScheduler) allowing users to register declarative cron jobs that automatically instantiate specific Agents and goals against target Environments.
+
+### Step 17.2 — Memory Consolidation ("Dreams")
+Implement an async background task that scans SQLite FTS5 memories across sessions to consolidate duplicates, prune stale configuration knowledge, and summarize themes (going beyond simple use-count deletion).
+
+### Step 17.3 — Advisor Sub-Inference
+Add an `advisor` tool parameter that allows a Primary Agent to pause its execution, hand its current transcript state to a cheaper/faster model (or specialized security model), and receive strategic guidance before proceeding.
+
+### Step 17.4 — Webhooks
+Develop a webhook dispatcher that fires outbound HTTP payloads to registered endpoints (CI/CD pipelines, internal ticketing systems) on session completion or failure.
+
+---
+
+## Final acceptance — the system is "done" for v1 (Phases 0-13) when
 
 - A real DevOps goal, given via Telegram, flows through Goal → Context → Agent → Policy → (approval if needed) → Execution → Verification → Receipt → Learning check, against real k3s/AKS/EKS infrastructure.
 - At least one skill has been learned, approved, validated, and reused.
@@ -697,4 +752,4 @@ Acceptance for the whole phase: deliberately attempt an out-of-scope action in a
 - Secrets are confirmed to exist only in Vault, never in source, config, or shell history.
 - A Grafana dashboard shows real traces from real runs.
 
-At that point, the DevOps domain pack is genuinely operational, and every later domain pack installs on top of this same, now-proven, core.
+At that point, the core framework is genuinely operational, transitioning from an interactive CLI engine to an asynchronous, robust backend platform ready for Phase 14-17 (Control Plane).
