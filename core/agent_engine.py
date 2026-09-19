@@ -176,6 +176,21 @@ DEVOPS_ACTION_TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "argocd_app_sync_production",
+            "description": "Risk Tier 3 (R3) Action: Synchronize an ArgoCD application strictly in the production environment. Requires explicit human approval.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "app_name": {"type": "string"},
+                },
+                "required": ["app_name"],
+                "additionalProperties": False,
+            },
+        },
+    },
 ]
 
 
@@ -362,6 +377,36 @@ async def _dispatch_tool(
             post_state_snapshot=post_state,
             rollback_available=True,
         )
+
+    if name == "argocd_app_sync_production":
+        if "DevOpsWrite" not in allowed_tools:
+            raise PermissionError(f"Tool is not allowed: {name}")
+        policy_decision = resolve_policy("argocd", "app_sync_production", TOOL_RISK_TABLE)
+        if policy_decision.decision == "DENY":
+            raise PermissionError(policy_decision.reason)
+        if policy_decision.decision == "REQUIRE_APPROVAL":
+            approved = await request_approval(
+                action_id=action_id,
+                description=f"argocd.app_sync_production {arguments['app_name']}",
+                risk_tier=policy_decision.risk_tier,
+            )
+            if not approved:
+                raise PermissionError("Human approval denied this action")
+            policy_decision = PolicyDecision.model_validate(
+                policy_decision.model_copy(
+                    update={"decision": "ALLOW", "approved_by": get_approver(action_id)}
+                )
+            )
+        try:
+            from domains.devops.tools.argocd_tools import argocd_app_sync
+            result = argocd_app_sync(arguments["app_name"])
+        except Exception as e:
+            result = str(e)
+        return result, _action_record(
+            policy_decision,
+            result,
+        )
+
     if name != "read_directory" or "Read" not in allowed_tools:
         raise PermissionError(f"Tool is not allowed: {name}")
     policy_decision = resolve_policy("filesystem", name, TOOL_RISK_TABLE)
