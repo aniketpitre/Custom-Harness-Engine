@@ -35,15 +35,14 @@ The implementation sequence is documented in `harness-engine-implementation-plan
 | 9     | Learning loop                  | ✅ DONE           | —                                                                |
 | 10    | Write actions & GitOps path    | ⚠️ PARTIAL        | Real PR/merge/ArgoCD test needs an approved target repo          |
 | 11    | Observability                  | ✅ DONE           | —                                                                |
-| 12    | Orchestration layer            | ⚠️ PARTIAL        | Live orchestration test run pending                              |
+| 12    | Orchestration layer            | ✅ DONE           | —                                                                |
 | 13    | Hardening                      | ✅ DONE (in code) | —                                                                |
 
 ### What a new session should do next
 
-1. **Phase 12 live test** — Run the orchestration workflow (`core/gateway/workflow.py`) end-to-end against the kind cluster. This is the only actionable item that does not require external prerequisites.
-2. **Phase 7 ArgoCD** — Blocked: the kind cluster cannot pull images from quay.io. Needs either a cluster with external registry access or a pre-loaded ArgoCD image set.
-3. **Phase 10 GitOps PR** — Blocked: requires an explicitly approved target repository and branch. Do not invoke the wrapper against this repository or production without an explicit approved target.
-4. **Phase 6 R3 action** — Low priority: implement or connect a real R3 infrastructure action (currently only R2 pod restart is executable).
+1. **Phase 7 ArgoCD** — Blocked: the kind cluster cannot pull images from quay.io. Needs either a cluster with external registry access or a pre-loaded ArgoCD image set.
+2. **Phase 10 GitOps PR** — Blocked: requires an explicitly approved target repository and branch. Do not invoke the wrapper against this repository or production without an explicit approved target.
+3. **Phase 6 R3 action** — Low priority: implement or connect a real R3 infrastructure action (currently only R2 pod restart is executable).
 
 ### Key runtime notes for a fresh agent
 
@@ -337,11 +336,12 @@ Completed:
 - A standard Grafana dashboard definition is deployed into `config/dashboard.json`.
 
 ### Phase 12: Orchestration layer
-Implementation complete, live test run pending.
+Implementation and live acceptance complete.
 - `core/primitives/orchestration.py` implemented `OrchestrationPlan`, `Phase`, and `SubagentSpec`.
 - `core/orchestration/executor.py` logic added for fanning out Phase jobs and checkpoint/resume behavior.
 - Convergence and checkpoints supported via SQLite `workflow_checkpoints` injected into `core/memory/store.py`.
-- Final real test case workflow script added at `core/gateway/workflow.py` for "Adversarial cross-check" (live network tests not yet executed).
+- Final real test case workflow script added at `core/gateway/workflow.py` for "Adversarial cross-check".
+- Live test completed: workflow correctly fanned out, executed phases, passed context between phases, and avoided resuming finished phases.
 
 ### Phase 13: Hardening
 Implementation complete in code.
