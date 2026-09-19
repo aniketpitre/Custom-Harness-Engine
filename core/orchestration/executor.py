@@ -27,7 +27,14 @@ async def execute_phase(phase: Phase, context: ContextPacket) -> list[dict[str, 
         if isinstance(r, Exception):
             final_results.append({"error": str(r), "subagent_id": phase.subagent_specs[i].id})
         else:
-            final_results.append(r)
+            # Strip non-serializable elements before returning for checkpointing
+            clean_result = {
+                "subagent_id": phase.subagent_specs[i].id,
+                "final_text": r.get("final_text"),
+                "model_used": r.get("model_used"),
+                "actions": [a.model_dump() for a in r.get("actions", [])] if r.get("actions") else [],
+            }
+            final_results.append(clean_result)
     return final_results
 
 async def execute_plan(plan: OrchestrationPlan, context: ContextPacket) -> list[list[dict[str, Any]]]:
