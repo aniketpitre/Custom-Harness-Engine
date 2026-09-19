@@ -11,6 +11,7 @@ TOOL_RISK_TABLE = {
     ("kubectl", "restart_pod"): RiskTier.R2,
     ("argocd", "app_sync_staging"): RiskTier.R2,
     ("argocd", "app_sync_production"): RiskTier.R3,
+    ("gitops", "propose_change"): RiskTier.R2,
     ("kubectl", "delete_namespace"): RiskTier.R4,
     ("terraform", "destroy"): RiskTier.R4,
 }

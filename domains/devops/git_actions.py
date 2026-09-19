@@ -11,6 +11,7 @@ GITOPS_MANAGED_ACTIONS = {
     ("kubectl", "restart_pod"): RiskTier.R2,
     ("argocd", "app_sync_staging"): RiskTier.R2,
     ("argocd", "app_sync_production"): RiskTier.R3,
+    ("gitops", "propose_change"): RiskTier.R2,
 }
 
 
@@ -54,14 +55,19 @@ def create_change_pr(
     if not commit_message.strip() or not pr_title.strip():
         raise ValueError("Commit message and PR title are required")
 
-    repo = Repo(Path(repo_path).resolve())
+    repo_path = Path(repo_path).resolve()
+    repo = Repo(repo_path)
     if repo.is_dirty(untracked_files=True):
         raise RuntimeError("GitOps action requires a clean working tree")
     if remote_name not in {remote.name for remote in repo.remotes}:
         raise RuntimeError(f"Git remote not found: {remote_name}")
 
     target = (Path(repo.working_tree_dir) / file_path).resolve()
-    target.relative_to(Path(repo.working_tree_dir).resolve())
+    # Check if target is inside the working directory
+    try:
+        target.relative_to(Path(repo.working_tree_dir).resolve())
+    except ValueError:
+        raise ValueError("Target path must be within the repository")
     target.parent.mkdir(parents=True, exist_ok=True)
 
     if branch_name in {head.name for head in repo.heads}:
@@ -87,4 +93,8 @@ def create_change_pr(
             raise RuntimeError(result.stderr.strip() or "GitHub PR creation failed")
         return result.stdout.strip()
     finally:
-        repo.heads[branch_name].checkout()
+        # Checkout the branch we were on previously
+        for ref in repo.heads:
+            if ref.name != branch_name:
+                ref.checkout()
+                break

@@ -146,8 +146,9 @@ Remaining:
 
 - Run `kubectl_restart_pod` against a real approved non-critical pod, approve it through Telegram, verify the pod is recreated, and verify the R2 `ALLOW` action records the Telegram user ID.
 - Implement or connect a real R3 action before claiming R3 acceptance; currently only the R2 restart action is executable.
-- Consolidate the direct polling path and application callback path in the Telegram gateway.
 - Do not run the live mutation against production.
+
+**UPDATE**: The direct polling path and application callback path in the Telegram gateway were properly consolidated. The redundant `python-telegram-bot` Application daemon setup was removed in favor of the lightweight, blocking `bot.get_updates` loop to fit seamlessly into CLI `asyncio.run` invocations.
 
 ### Phase 7: DevOps read-only domain pack
 
@@ -285,6 +286,7 @@ Completed:
 - `resolve_gitops_route` registers the R2/R3 GitOps-managed action set and requires approval before PR creation.
 - The wrapper requires a clean working tree, an existing remote, a non-protected branch name, an explicit repository-relative target path, and a non-empty change.
 - The wrapper returns the created PR reference and restores the original branch after the operation.
+- **UPDATE:** Wired GitOps cleanly into `core/agent_engine.py`. Added a `gitops_propose_change` tool to the agent framework schema mapping correctly to Git Operations. When invoked, it verifies the action requires human approval using `resolve_gitops_route` and issues a `create_change_pr` on success—shielding environments from direct imperative updates and routing R2+ infrastructure targets dynamically to Git PRs.
 
 Validation completed:
 
@@ -295,7 +297,6 @@ Validation completed:
 
 Remaining:
 
-- Route approved R2+ GitOps-manageable actions through this wrapper.
 - Run a real low-risk test change against an explicitly approved repository and branch.
 - Confirm a real PR is opened, merged manually, and synchronized by ArgoCD.
 - Verify the post-merge live state and record the result in a `RunReceipt`.
