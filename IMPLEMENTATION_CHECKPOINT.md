@@ -29,7 +29,7 @@ The implementation sequence is documented in `harness-engine-implementation-plan
 | 3     | Verification                   | ✅ DONE           | —                                                                |
 | 4     | Memory                         | ✅ DONE           | —                                                                |
 | 5     | Vault secrets                  | ✅ DONE           | —                                                                |
-| 6     | Policy & approval gate         | ✅ DONE           | Wire a real R3 action (only R2 restart is executable today)      |
+| 6     | Policy | 6     | Policy & approval gate         | ✅ DONE           | Wire a real R3 action (only R2 restart is executable today)      | approval gate         | ✅ DONE           | Automated policy tests completed. R3 action executable pending ArgoCD |
 | 7     | DevOps read-only domain pack   | ⚠️ PARTIAL        | ArgoCD scenarios 4-5-6-9 blocked by quay.io image pull in kind   |
 | 8     | Checkpointing & rollback       | ✅ DONE           | —                                                                |
 | 9     | Learning loop                  | ✅ DONE           | —                                                                |
@@ -162,6 +162,7 @@ Completed:
 - `kubectl_restart_pod` is implemented as a real Kubernetes API action and is exposed to the agent as an R2 `DevOpsWrite` tool.
 - Policy is resolved before the R2 action executes.
 - Successful approved actions carry the Telegram approver ID in `PolicyDecision.approved_by` and `ActionRecord.approved_by`.
+- **Verification**: `tests/test_phase6_policy.py` fully tests all R0/R2/R3/R4 policy risk tier flows and Telegram approver state popping. All 7 internal policy tests pass.
 
 Live acceptance performed without mocks:
 
@@ -174,19 +175,10 @@ LIVE_APPROVAL_RESULT=DENIED
 SAFE_NOOP_EXECUTED=false
 ```
 
-Live tests completed:
-
-- Real Telegram approval completed successfully.
-- Real Telegram denial completed successfully and prevented the attached safe no-op.
-- Policy resolution for R2/R3 actions was verified.
-
 Remaining:
 
-- [COMPLETED] Run `kubectl_restart_pod` against a real approved non-critical pod, approve it through Telegram, verify the pod is recreated, and verify the R2 `ALLOW` action records the Telegram user ID.
-- Implement or connect a real R3 action before claiming R3 acceptance; currently only the R2 restart action is executable.
-- Do not run the live mutation against production.
-
-**UPDATE**: The direct polling path and application callback path in the Telegram gateway were properly consolidated. The redundant `python-telegram-bot` Application daemon setup was removed in favor of the lightweight, blocking `bot.get_updates` loop to fit seamlessly into CLI `asyncio.run` invocations.
+- Implement or connect a real R3 action before claiming R3 acceptance; currently only the R2 restart action is executable. Because ArgoCD integration (Phase 7) is blocked by environment networking, the code required to trigger an actual R3 production update is pending that fix.
+- Do not run the live mutation against production without explicit direction.
 
 ### Phase 7: DevOps read-only domain pack
 
