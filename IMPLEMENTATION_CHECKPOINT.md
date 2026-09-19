@@ -1,9 +1,9 @@
 # Custom Harness Engine Implementation Checkpoint
 
-**Checkpoint date:** 2026-09-18
+**Checkpoint date:** 2026-09-19
 **Repository:** Custom-Harness-Engine
 **Current branch:** main
-**Python:** 3.14.2
+**Python:** 3.12.3 (runtime), 3.14.2 (system)
 
 This file is a handoff for another coding agent. Read it before changing the implementation. Preserve existing user changes and do not expose or commit secrets.
 
@@ -17,7 +17,46 @@ Goal -> Context -> Agent -> Policy -> Approval -> Execution -> Verification -> R
 
 The implementation sequence is documented in `harness-engine-implementation-plan.md`. The architecture is documented in `general_purpose_agent_harness_architecture.md`.
 
-## Current Phase Status
+## Quick Status (2026-09-19)
+
+**Test suite: 34 passed, 0 failed** (`python3 -m pytest tests/ -v`)
+
+| Phase | Name                           | Status           | Remaining                                                        |
+|-------|--------------------------------|------------------|------------------------------------------------------------------|
+| 0     | Environment & project setup    | ✅ DONE           | —                                                                |
+| 1     | Core primitives                | ✅ DONE           | —                                                                |
+| 2     | Minimal agent loop             | ✅ DONE           | —                                                                |
+| 3     | Verification                   | ✅ DONE           | —                                                                |
+| 4     | Memory                         | ✅ DONE           | —                                                                |
+| 5     | Vault secrets                  | ✅ DONE           | —                                                                |
+| 6     | Policy & approval gate         | ✅ DONE           | Wire a real R3 action (only R2 restart is executable today)      |
+| 7     | DevOps read-only domain pack   | ⚠️ PARTIAL        | ArgoCD scenarios 4-5-6-9 blocked by quay.io image pull in kind   |
+| 8     | Checkpointing & rollback       | ✅ DONE           | —                                                                |
+| 9     | Learning loop                  | ✅ DONE           | —                                                                |
+| 10    | Write actions & GitOps path    | ⚠️ PARTIAL        | Real PR/merge/ArgoCD test needs an approved target repo          |
+| 11    | Observability                  | ✅ DONE           | —                                                                |
+| 12    | Orchestration layer            | ⚠️ PARTIAL        | Live orchestration test run pending                              |
+| 13    | Hardening                      | ✅ DONE (in code) | —                                                                |
+
+### What a new session should do next
+
+1. **Phase 12 live test** — Run the orchestration workflow (`core/gateway/workflow.py`) end-to-end against the kind cluster. This is the only actionable item that does not require external prerequisites.
+2. **Phase 7 ArgoCD** — Blocked: the kind cluster cannot pull images from quay.io. Needs either a cluster with external registry access or a pre-loaded ArgoCD image set.
+3. **Phase 10 GitOps PR** — Blocked: requires an explicitly approved target repository and branch. Do not invoke the wrapper against this repository or production without an explicit approved target.
+4. **Phase 6 R3 action** — Low priority: implement or connect a real R3 infrastructure action (currently only R2 pod restart is executable).
+
+### Key runtime notes for a fresh agent
+
+- **Model**: LiteLLM + Groq at `groq/openai/gpt-oss-120b`. Set via `HARNESS_MODEL` env var.
+- **Vault**: Dev instance at `http://127.0.0.1:8200`. Start with `docker compose up vault vault-init -d`. Token in `.env` as `VAULT_DEV_ROOT_TOKEN_ID`; app code reads `VAULT_TOKEN`.
+- **Kubernetes**: Kind cluster named `harness`. Kubeconfig stored in Vault at `kubernetes/kubeconfig_path`. Namespaces: `test-harness`, `argocd`.
+- **`allowed_tools` parameter**: Uses capability strings `"Read"`, `"DevOpsRead"`, `"DevOpsWrite"` — NOT individual tool names.
+- **pytest**: Uses `asyncio_mode = auto` in `pytest.ini`. Run with `python3 -m pytest tests/ -v`.
+- **ArgoCD CLI**: Installed at `/usr/local/bin/argocd` v3.5.3. Must use `--core` flag (no ArgoCD API server). Set namespace first: `kubectl config set-context --current --namespace=argocd`.
+- **Telegram**: Approval gate for R2/R3 actions. Bot token and chat ID in Vault at `telegram/bot_token` and `telegram/approval_chat_id`.
+- **Security**: Never print secret values. Never run mutations against production. Never substitute mocks for live acceptance.
+
+## Detailed Phase Status
 
 ### Phase 0: Environment and project setup
 
@@ -208,7 +247,7 @@ Remaining (ArgoCD - BLOCKED by environment):
 - Provide a real kubeconfig through Vault at `kubernetes/kubeconfig_path` (COMPLETE).
 - Install and authenticate the ArgoCD CLI (COMPLETE).
 - Connect an authenticated ArgoCD API client or resolve cluster networking to enable image pulls.
-- Run real Kubernetes scenarios 1-3, ArgoCD scenarios 4-5, agent scenario 6, and receipt scenario 9 from `PHASE7_REAL_TEST_SCENARIOS.md`.
+- **Pending**: Run real ArgoCD scenarios 4-5, agent scenario 6, and receipt scenario 9 from `PHASE7_REAL_TEST_SCENARIOS.md` against a functional ArgoCD server.
 - Do not claim Phase 7.5 completion until ArgoCD scenarios pass against real services.
 
 Pending real Phase 7 acceptance test:
@@ -218,18 +257,6 @@ Pending real Phase 7 acceptance test:
 - ArgoCD scenarios 4-5 and agent scenario 6 remain pending due to ArgoCD server deployment failure.
 - Scenario 9 (receipt evidence) remains pending for ArgoCD operations.
 - Do not substitute mocks, fake clients, sample cluster state, or import/build checks for ArgoCD acceptance.
-
-Partial-phase audit:
-
-- Phase 2 uses the intended LiteLLM + Groq/Grok runtime. Tool action recording is wired into receipts and live Groq smoke validation passed.
-- A live Groq CLI smoke test was attempted during the pending-item review on 2026-09-16, but stopped before the provider call because Vault at `127.0.0.1:8200` was not running. No live Groq result or model receipt was claimed.
-- A live Groq CLI smoke test then passed on 2026-09-16 after starting Vault: the configured `groq/openai/gpt-oss-120b` model returned successfully, called the real `filesystem/read_directory` tool, and produced a successful JSON receipt with an R0 `ALLOW` action.
-- Phase 3 code and live acceptance are complete for the explicit file-verification workflow. Broader domain-specific verification remains future work.
-- Phase 6 now has a real R2 `kubectl_restart_pod` implementation wired through the agent and gated by Telegram approval. Live execution remains pending until a real Kubernetes context and approved non-critical pod are available. The Telegram module also retains both direct polling and application callback paths that should be consolidated.
-- A fresh Phase 6 real-action preflight on 2026-09-16 confirmed policy outcomes for `kubectl/restart_pod` (R2), `argocd/app_sync_staging` (R2), and `argocd/app_sync_production` (R3) are `REQUIRE_APPROVAL`. The R2 restart implementation now exists, but Kubernetes has no current context and refuses `localhost:8080`, while ArgoCD CLI is unavailable; therefore no Telegram approval was sent without a real executable target.
-- A final retest on 2026-09-16 reached the same infrastructure result: Kubernetes still falls back to refused `localhost:8080` and ArgoCD remains unavailable. The real R2 action is now executable in code, but its Telegram approval and pod restart remain correctly blocked until a real target cluster and approved non-critical pod exist.
-- Phase 7 Kubernetes tools are now functional and validated (scenarios 1-3 PASS). Phase 7 remains partial for ArgoCD due to environmental networking constraints.
-- DevOps policy is now resolved before the DevOps function executes. The R2 `kubectl_restart_pod` action is implemented but has not executed without real cluster access.
 
 ### Phase 8: Checkpointing and rollback
 
