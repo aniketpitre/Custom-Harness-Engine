@@ -66,4 +66,4 @@ def test_tool_schema_names():
     assert read_names == {"kubectl_get_pods", "kubectl_describe_pod", "kubectl_logs", "argocd_app_list", "argocd_app_get"}
 
     write_names = {t["function"]["name"] for t in DEVOPS_ACTION_TOOLS}
-    assert write_names == {"gitops_propose_change", "kubectl_restart_pod"}
+    assert write_names == {"gitops_propose_change", "kubectl_restart_pod", "argocd_app_sync_production"}

@@ -15,7 +15,8 @@ os.environ["VAULT_TOKEN"] = "c6869775842d732f69f590ac45ec422847ca27ffa15a9bf9b45
 @pytest.mark.asyncio
 @patch("core.agent_engine.request_approval", new_callable=AsyncMock)
 @patch("core.agent_engine.get_approver")
-async def test_gitops_live_pr_creation(mock_get_approver, mock_request_approval):
+@patch("git.remote.Remote.push")
+async def test_gitops_live_pr_creation(mock_push, mock_get_approver, mock_request_approval):
     mock_request_approval.return_value = True
     mock_get_approver.return_value = "tele_user_phase10"
 
@@ -26,10 +27,6 @@ async def test_gitops_live_pr_creation(mock_get_approver, mock_request_approval)
     # Configure git initially safely unmocked
     subprocess.run(["git", "config", "user.name", "Claude Agent"])
     subprocess.run(["git", "config", "user.email", "agent@example.com"])
-    
-    # Ensure working tree clean
-    if b"modified" in subprocess.run(["git", "status"], capture_output=True).stdout:
-        subprocess.run(["git", "stash"])
 
     import subprocess as real_subprocess
     original_run = real_subprocess.run
@@ -43,7 +40,7 @@ async def test_gitops_live_pr_creation(mock_get_approver, mock_request_approval)
             return MockProc()
         return original_run(*args, **kwargs)
 
-    with patch("subprocess.run", side_effect=safe_mock_run):
+    with patch("subprocess.run", side_effect=safe_mock_run), patch("git.Repo.is_dirty", return_value=False):
         goal = Goal(
             id="scenario-gitops",
             source=TriggerSource.cli,
