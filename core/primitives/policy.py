@@ -1,5 +1,12 @@
 from enum import StrEnum
 
+
+from opentelemetry import trace
+try:
+    tracer = trace.get_tracer(__name__)
+except Exception:
+    pass
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -26,6 +33,20 @@ TOOL_RISK_TABLE: dict[tuple[str, str], RiskTier] = {}
 
 
 def resolve_policy(
+    tool: str,
+    action: str,
+    risk_table: dict[tuple[str, str], RiskTier] | None = None,
+    approved_by: str | None = None,
+) -> PolicyDecision:
+    with tracer.start_as_current_span("resolve_policy") as span:
+        span.set_attribute("policy.tool", tool)
+        span.set_attribute("policy.action", action)
+        decision = _resolve_policy_internal(tool, action, risk_table, approved_by)
+        span.set_attribute("policy.decision", decision.decision)
+        span.set_attribute("policy.risk_tier", str(decision.risk_tier))
+        return decision
+
+def _resolve_policy_internal(
     tool: str,
     action: str,
     risk_table: dict[tuple[str, str], RiskTier] | None = None,

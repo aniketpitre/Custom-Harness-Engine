@@ -301,3 +301,13 @@ Remaining:
 - Confirm a real PR is opened, merged manually, and synchronized by ArgoCD.
 - Verify the post-merge live state and record the result in a `RunReceipt`.
 - Do not invoke the wrapper against this repository or production without an explicit approved target.
+### Phase 11: Observability
+
+Implementation complete.
+
+Completed:
+
+- `opentelemetry-sdk` installed and hooked into `core/agent_engine.py` using `OTLPSpanExporter`.
+- Telemetry captures the primary `harness_agent_run` bounding traces spanning LLM execution.
+- Telemetry dynamically annotates `resolve_policy` hooks across action tiers.
+- A standard Grafana dashboard definition is deployed into `config/dashboard.json`.

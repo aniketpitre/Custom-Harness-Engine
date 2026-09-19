@@ -6,6 +6,30 @@ from typing import Any
 
 import litellm
 
+from opentelemetry import trace
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.litellm import LitellmInstrumentor
+
+def init_tracing():
+    try:
+        otlp_endpoint = get_secret("otel", "endpoint")
+        if otlp_endpoint:
+            resource = Resource.create({"service.name": "harness-engine", "service.version": "0.1.0"})
+            provider = TracerProvider(resource=resource)
+            processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=otlp_endpoint))
+            provider.add_span_processor(processor)
+            trace.set_tracer_provider(provider)
+            LitellmInstrumentor().instrument()
+            return trace.get_tracer(__name__)
+    except Exception:
+        pass
+    return trace.get_tracer(__name__)
+
+tracer = init_tracing()
+
 from core.secrets import get_secret
 from core.gateway.telegram import get_approver, request_approval
 from core.primitives.policy import PolicyDecision, resolve_policy
@@ -156,62 +180,68 @@ DEVOPS_ACTION_TOOLS = [
 
 
 async def run_agent(context: ContextPacket, allowed_tools: list[str]) -> dict[str, Any]:
-    model = os.getenv("HARNESS_MODEL") or os.getenv("GROK_MODEL") or "groq/openai/gpt-oss-120b"
-    api_key = get_secret("groq", "api_key")
-    messages: list[dict[str, Any]] = [
-        {
-            "role": "system",
-            "content": "You are an execution agent. Use available tools when they provide direct evidence for the goal.",
-        },
-        {"role": "user", "content": _build_prompt(context)},
-    ]
-    tools = [READ_DIRECTORY_TOOL] if "Read" in allowed_tools else []
-    if "DevOpsRead" in allowed_tools:
-        tools.extend(DEVOPS_READ_TOOLS)
-    if "DevOpsWrite" in allowed_tools:
-        tools.extend(DEVOPS_ACTION_TOOLS)
-    events: list[Any] = []
-    actions: list[ActionRecord] = []
-
-    for _ in range(8):
-        response = await litellm.acompletion(
-            model=model,
-            api_key=api_key,
-            messages=messages,
-            tools=tools or None,
-            tool_choice="auto" if tools else None,
-        )
-        events.append(response)
-        message = response.choices[0].message
-        tool_calls = getattr(message, "tool_calls", None) or []
-        if not tool_calls:
-            return {
-                "events": events,
-                "final_text": getattr(message, "content", None) or "",
-                "model_used": model,
-                "actions": actions,
-                "verification": _run_requested_verification(context),
-            }
-
-        messages.append(_assistant_message(message, tool_calls))
-        for tool_call in tool_calls:
-            arguments = json.loads(tool_call.function.arguments or "{}")
-            tool_result, action = await _dispatch_tool(
-                tool_call.id,
-                tool_call.function.name,
-                arguments,
-                allowed_tools,
+    with tracer.start_as_current_span("harness_agent_run") as span:
+        span.set_attribute("agent.goal", context.goal.raw_input)
+        span.set_attribute("agent.domain", context.goal.domain)
+        span.set_attribute("agent.trigger_source", context.goal.source.value)
+        model = os.getenv("HARNESS_MODEL") or os.getenv("GROK_MODEL") or "groq/openai/gpt-oss-120b"
+        api_key = get_secret("groq", "api_key")
+        messages: list[dict[str, Any]] = [
+            {
+                "role": "system",
+                "content": "You are an execution agent. Use available tools when they provide direct evidence for the goal.",
+            },
+            {"role": "user", "content": _build_prompt(context)},
+        ]
+        tools = [READ_DIRECTORY_TOOL] if "Read" in allowed_tools else []
+        if "DevOpsRead" in allowed_tools:
+            tools.extend(DEVOPS_READ_TOOLS)
+        if "DevOpsWrite" in allowed_tools:
+            tools.extend(DEVOPS_ACTION_TOOLS)
+        events: list[Any] = []
+        actions: list[ActionRecord] = []
+    
+        for _ in range(8):
+            span.add_event(f"llm_completion_turn_{_}", {"turn_number": _})
+            response = await litellm.acompletion(
+                model=model,
+                api_key=api_key,
+                messages=messages,
+                tools=tools or None,
+                tool_choice="auto" if tools else None,
             )
-            actions.append(action)
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "content": tool_result,
+            events.append(response)
+            message = response.choices[0].message
+            tool_calls = getattr(message, "tool_calls", None) or []
+            if not tool_calls:
+                return {
+                    "events": events,
+                    "final_text": getattr(message, "content", None) or "",
+                    "model_used": model,
+                    "actions": actions,
+                    "verification": _run_requested_verification(context),
                 }
-            )
-
-    raise RuntimeError("Grok exceeded the maximum number of tool turns (8)")
+    
+            messages.append(_assistant_message(message, tool_calls))
+            for tool_call in tool_calls:
+                arguments = json.loads(tool_call.function.arguments or "{}")
+                tool_result, action = await _dispatch_tool(
+                    tool_call.id,
+                    tool_call.function.name,
+                    arguments,
+                    allowed_tools,
+                )
+                actions.append(action)
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": tool_result,
+                    }
+                )
+    
+        span.set_status(trace.Status(trace.StatusCode.ERROR, "Max tool turns exceeded"))
+        raise RuntimeError("Grok exceeded the maximum number of tool turns (8)")
 
 
 def _build_prompt(context: ContextPacket) -> str:

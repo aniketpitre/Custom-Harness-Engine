@@ -8,3 +8,4 @@ secrets/*.local
 config/settings.local.yaml
 # Local full workspace backups
 Custom-Harness-Engine-full-backup-*.zip
+.venv-new/
