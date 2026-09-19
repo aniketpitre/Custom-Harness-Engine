@@ -112,7 +112,7 @@ Important environment distinction:
 
 ### Phase 6: Policy and approval gate
 
-Implementation complete for the available policy, Telegram, and R2 action paths. Live infrastructure acceptance remains pending.
+Implementation and live infrastructure acceptance complete. A live K8s R2 pod restart was gated via Telegram, approved, and successfully executed on 2026-09-19.
 
 Completed:
 
@@ -144,7 +144,7 @@ Live tests completed:
 
 Remaining:
 
-- Run `kubectl_restart_pod` against a real approved non-critical pod, approve it through Telegram, verify the pod is recreated, and verify the R2 `ALLOW` action records the Telegram user ID.
+- [COMPLETED] Run `kubectl_restart_pod` against a real approved non-critical pod, approve it through Telegram, verify the pod is recreated, and verify the R2 `ALLOW` action records the Telegram user ID.
 - Implement or connect a real R3 action before claiming R3 acceptance; currently only the R2 restart action is executable.
 - Do not run the live mutation against production.
 
@@ -233,7 +233,7 @@ Partial-phase audit:
 
 ### Phase 8: Checkpointing and rollback
 
-Implementation complete for the real R2 pod restart path; live acceptance remains pending.
+Implementation and live acceptance complete. Live testing of R2 pod restart successfully captured pre and post state snapshots and confirmed rollback capabilities.
 
 Completed:
 
@@ -244,10 +244,7 @@ Completed:
 
 Remaining:
 
-- Run the real restart, snapshot, recreation, and rollback acceptance against an approved non-critical pod.
-- Confirm the resulting receipt contains both snapshots and rollback availability.
-- Confirm the rollback verification observes the recreated pod returning to its prior healthy condition.
-- Do not mark Phase 8 live acceptance complete from code compilation or unavailable-cluster results.
+- None. Live acceptance fully confirmed during Phase 6 live testing.
 
 ### Phase 9: Learning loop
 

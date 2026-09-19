@@ -11,7 +11,7 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.litellm import LitellmInstrumentor
+from opentelemetry.instrumentation.litellm import LiteLLMInstrumentor
 
 def init_tracing():
     try:
@@ -22,7 +22,7 @@ def init_tracing():
             processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=otlp_endpoint))
             provider.add_span_processor(processor)
             trace.set_tracer_provider(provider)
-            LitellmInstrumentor().instrument()
+            LiteLLMInstrumentor().instrument()
             return trace.get_tracer(__name__)
     except Exception:
         pass

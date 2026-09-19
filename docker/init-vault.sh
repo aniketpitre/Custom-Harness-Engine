@@ -13,3 +13,4 @@ vault kv put harness-secrets/groq api_key="$GROQ_API_KEY"
 vault kv put harness-secrets/telegram \
 	bot_token="$TELEGRAM_BOT_TOKEN" \
 	approval_chat_id="$TELEGRAM_APPROVAL_CHAT_ID"
+vault kv put harness-secrets/kubernetes kubeconfig_path="/root/.kube/config"
