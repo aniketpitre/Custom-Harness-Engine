@@ -70,13 +70,24 @@ def init_db(db_path: str | Path = DB_PATH) -> sqlite3.Connection:
             updated_at TEXT NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS workflow_checkpoints (
-            workflow_id TEXT,
-            phase_index INTEGER,
-            status TEXT,
-            result_json TEXT,
-            updated_at TEXT,
-            PRIMARY KEY (workflow_id, phase_index)
+        CREATE TABLE IF NOT EXISTS approval_queue (
+            id TEXT PRIMARY KEY,
+            kind TEXT NOT NULL,
+            description TEXT NOT NULL,
+            risk_tier TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            decided_by TEXT,
+            created_at TEXT NOT NULL,
+            decided_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS analytics_daily (
+            date TEXT PRIMARY KEY,
+            total_tokens INTEGER DEFAULT 0,
+            total_runs INTEGER DEFAULT 0,
+            policy_allows INTEGER DEFAULT 0,
+            policy_approvals INTEGER DEFAULT 0,
+            policy_denies INTEGER DEFAULT 0
         );
         """
     )

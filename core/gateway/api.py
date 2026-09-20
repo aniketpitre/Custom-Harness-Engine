@@ -20,8 +20,19 @@ from core.memory.store import search_memory
 from core.primitives.learning import draft_skill_if_warranted
 
 
+from fastapi import FastAPI, HTTPException, BackgroundTasks, APIRouter, Depends
+
+# ... (rest of imports)
+
 app = FastAPI(title="Harness Engine Control Plane API")
-registry = AgentRegistry()
+dashboard_api = APIRouter(prefix="/api")
+
+@dashboard_api.get("/status")
+def get_status():
+    # Implementation placeholder for Overview page
+    return {"status": "ok", "active_runs": 0}
+
+app.include_router(dashboard_api)
 
 
 
