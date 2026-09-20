@@ -39,7 +39,7 @@ The implementation sequence is documented in `harness-engine-implementation-plan
 | 13    | Hardening                      | ✅ DONE (in code) | —                                                                |
 | 14    | Unified Control Plane & API    | ✅ DONE           | —                                                                |
 | 15    | Event Streaming & Interactive  | ✅ DONE           | —                                                                |
-| 16    | Context | 16    | Context & Execution Hardening  | ⏳ PENDING        | Implement large output spilling, budgets, generic tool expansion | Execution Hardening  | ✅ DONE           | —                                                                |
+| 16    | Context & Execution Hardening  | ✅ DONE           | —                                                                |
 | 17    | Background Infrastructure      | ✅ DONE           | —                                                                |
 
 ### What a new session should do next
