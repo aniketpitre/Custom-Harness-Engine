@@ -2,6 +2,15 @@ import { useEffect, useState } from 'react';
 
 export const SessionDetail = ({ sessionId }: { sessionId: string }) => {
     const [events, setEvents] = useState<any[]>([]);
+    const [msg, setMsg] = useState('');
+
+    const handleInterrupt = () => {
+        fetch(`http://localhost:8000/sessions/${sessionId}/interrupt`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ message: msg })
+        });
+    }
 
     useEffect(() => {
         const eventSource = new EventSource(`http://localhost:8000/sessions/${sessionId}/stream`);
@@ -15,11 +24,11 @@ export const SessionDetail = ({ sessionId }: { sessionId: string }) => {
     return (
         <div>
             <h2>Stream: {sessionId}</h2>
+            <input value={msg} onChange={e => setMsg(e.target.value)} placeholder="Interruption message" />
+            <button onClick={handleInterrupt}>Interrupt</button>
             {events.map((e, index) => (
                 <div key={index} style={{ border: '1px solid #ccc', margin: '5px', padding: '5px' }}>
                     <strong>{e.type}</strong>
-                    {e.receipt?.verification?.passed === false && <span style={{ color: 'red' }}> [Risk: ALERT]</span>}
-                    {e.type === 'tool_result' && <span>Tier: {e.policy_tier || 'N/A'}</span>}
                     <pre>{JSON.stringify(e, null, 2)}</pre>
                 </div>
             ))}

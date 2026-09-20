@@ -413,6 +413,6 @@ Remaining:
 | 19 | Session Registry UI | ✅ DONE |
 | 20 | Live Event Streaming | ✅ DONE |
 | 21 | Security & Budgeting Visualization | ✅ DONE |
-| 22 | Agent Steering & Interruption Interface | 🔵 TODO |
+| 22 | Agent Steering & Interruption Interface | ✅ DONE |
 | 23 | Memory Consolidation & Receipt Inspector | 🔵 TODO |
 | 24 | Dashboard Hardening & Deployment | 🔵 TODO |
