@@ -104,3 +104,76 @@ def test_sse_generator_and_interruption(override_agents, temp_db, monkeypatch):
     conn = init_db(temp_db)
     session = get_session(conn, session_id)
     assert session["status"] == "success"
+
+
+def test_sse_client_disconnect(override_agents, temp_db, monkeypatch):
+    import asyncio
+    
+    # Mock LLM to yield slowly to guarantee we disconnect mid-stream
+    async def mock_acompletion(*args, **kwargs):
+        await asyncio.sleep(0.5)
+        class MockMessage:
+            def __init__(self):
+                self.content = "Mock LLM step"
+                self.tool_calls = None
+        class MockChoice:
+            def __init__(self):
+                self.message = MockMessage()
+        class MockResponse:
+            def __init__(self):
+                self.choices = [MockChoice()]
+            def dict(self):
+                return {"choices": [{"message": {"content": "Mock LLM step"}}]}
+            def model_dump(self):
+               return self.dict()
+        return MockResponse()
+
+    monkeypatch.setattr("litellm.acompletion", mock_acompletion)
+    monkeypatch.setattr("core.agent_engine.get_secret", lambda a, b: "mock-secret")
+
+    # Start Session via API
+    payload = {"agent_id": "test_agent", "goal": "Test SSE Chaos"}
+    resp = client.post("/sessions", json=payload)
+    session_id = resp.json()["session_id"]
+    
+    import time
+    
+    # Connect to stream and then abruptly close connection
+    try:
+        with client.stream("GET", f"/sessions/{session_id}/stream", timeout=0.2) as stream_response:
+             # Just breaking out and closing context should cancel the generator?
+             pass
+    except Exception as e:
+        print(f"Stream interrupted: {e}")
+        
+    time.sleep(0.5)
+
+    conn = init_db(temp_db)
+    session = get_session(conn, session_id)
+    # The session status should not be stuck in "running" forever, or at least it should gracefully terminate
+    print(f"Session status after disconnect: {session['status']}")
+
+
+def test_sse_cancelled_error_marks_failure(override_agents, temp_db, monkeypatch):
+    import asyncio
+    
+    async def mock_generator(*args, **kwargs):
+        yield {"type": "message", "content": "Starting"}
+        raise asyncio.CancelledError("Client disconnected")
+        
+    monkeypatch.setattr("core.gateway.api.run_agent_generator", mock_generator)
+    
+    payload = {"agent_id": "test_agent", "goal": "Test SSE Disconnect"}
+    resp = client.post("/sessions", json=payload)
+    session_id = resp.json()["session_id"]
+    
+    try:
+        with client.stream("GET", f"/sessions/{session_id}/stream") as stream_response:
+            for line in stream_response.iter_lines():
+                pass
+    except Exception as e:
+        print("Caught exception:", e)
+                
+    conn = init_db(temp_db)
+    session = get_session(conn, session_id)
+    assert session["status"] == "failure", "Should clean up stuck 'running' tasks on disconnect"

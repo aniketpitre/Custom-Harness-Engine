@@ -215,6 +215,13 @@ async def stream_session(session_id: str):
                     yield f"data: {json.dumps(event_to_yield)}\n\n"
                 else:
                     yield f"data: {json.dumps(event)}\n\n"
+        except asyncio.CancelledError:
+            conn = init_db()
+            try:
+                update_session(conn, session_id, "failure")
+            finally:
+                conn.close()
+            raise
         except Exception as e:
             conn = init_db()
             try:
