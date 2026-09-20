@@ -27,10 +27,23 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks, APIRouter, Depends
 app = FastAPI(title="Harness Engine Control Plane API")
 dashboard_api = APIRouter(prefix="/api")
 
-@dashboard_api.get("/status")
-def get_status():
-    # Implementation placeholder for Overview page
-    return {"status": "ok", "active_runs": 0}
+@dashboard_api.get("/runs")
+def get_runs():
+    conn = init_db()
+    try:
+        rows = conn.execute("SELECT * FROM sessions ORDER BY created_at DESC LIMIT 50").fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+@dashboard_api.get("/approvals")
+def get_approvals():
+    conn = init_db()
+    try:
+        rows = conn.execute("SELECT * FROM approval_queue WHERE status = 'pending'").fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
 
 app.include_router(dashboard_api)
 
