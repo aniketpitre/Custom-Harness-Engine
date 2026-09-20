@@ -1,67 +1,33 @@
-# Harness Engine Dashboard Implementation Plan
+# Harness Engine Dashboard Implementation Plan (Hermes-Exact)
 
-This document outlines the detailed phases for implementing the Harness Engine Dashboard, mirroring the Hermes agent dashboard architecture while utilizing Harness-native primitives.
+This document outlines the phases for upgrading the Harness Engine Dashboard to match the Hermes architecture pattern.
 
 ## Phases
 
 | Phase | Description | Status |
 | :--- | :--- | :--- |
-| **D0** | Dashboard Backend Extensions (FastAPI) | TODO |
-| **D1** | Frontend Scaffold (React/Vite) | TODO |
-| **D2** | Overview (Landing Page) | TODO |
-| **D3** | Live Run Page (SSE + Interruption) | TODO |
-| **D4** | Runs Page (FTS Search + Filter) | TODO |
-| **D5** | Settings, Secrets & Channels Pages | TODO |
-| **D6** | Skills, Tools & Learning Queue Pages | TODO |
-| **D7** | Analytics Page | TODO |
-| **D8** | Approval Gate, Triggers & Webhooks Pages | TODO |
-| **D9** | Orchestration & Verification Pages | TODO |
-| **D10** | System Page | TODO |
-| **D11** | Hardening & Deployment | TODO |
+| **D0-D11** | Backend API & Initial UI | ✅ DONE |
+| **D12** | Layout Refactor (Router, Layout Components) | TODO |
+| **D13** | Terminal Integration (XTerm.js) | TODO |
+| **D14** | Fluid UI Motion (motion) | TODO |
+| **D15** | Command Palette (Interactions) | TODO |
 
 ---
 
-## Detailed Breakdown
+## Detailed Breakdown (Hermes Parity)
 
-### Phase D0: Dashboard Backend Extensions
-- Create new API endpoints (`/api/*`) for dashboard data.
-- Implement auth middleware (HMAC session cookie, scrypt password hash).
-- Create D1 schema migrations for new tables (`approval_queue`, `analytics_daily`).
+### Phase D12: Layout Refactor
+- Implement `react-router` for multi-page workspace.
+- Refactor to `src/{pages,components,hooks,contexts,lib}` structure.
+- Introduce `Layout` component with sidebar-based scope switcher.
 
-### Phase D1: Frontend Scaffold
-- Initialize React/Vite/Tailwind frontend.
-- Implement app shell (nav sidebar, domain switcher, theme toggle).
-- Setup API proxy to backend.
+### Phase D13: Terminal Integration
+- Replace static log views with `xterm.js` and `xterm-addon-fit`.
+- Create log hook to manage stream state.
 
-### Phase D2: Overview Page
-- Dashboard home: throughput stats, gateway health, active runs, recent receipts.
+### Phase D14: Fluid UI Motion
+- Add `motion` for Hermes-style page transitions and interactivity.
 
-### Phase D3: Live Run Page
-- Live SSE stream timeline, interruption form, token budget monitoring.
+### Phase D15: Command Palette
+- Implement keyboard shortcut (`Cmd+K`) action hub.
 
-### Phase D4: Runs Page
-- Paginated table of RunReceipts with FTS search, status filtering, and JSON export.
-
-### Phase D5: Settings, Secrets & Channels Pages
-- Config forms, secret status inspector (read-only), channel config forms.
-
-### Phase D6: Skills, Tools & Learning Queue Pages
-- Skills toggle, Registry risk-tier editor, Learning Queue management.
-
-### Phase D7: Analytics Page
-- Usage metrics, pie charts for policy decisions, verification pass-rates over time.
-
-### Phase D8: Approval Gate, Triggers & Webhooks Pages
-- Approval management, CRON trigger management, webhook subscriptions.
-
-### Phase D9: Orchestration & Verification Pages
-- Multi-agent workflow visualization, drill-down into verification logs.
-
-### Phase D10: System Page
-- Health status, Curator trigger, Memory Dream trigger/viewer, Log viewer.
-
-### Phase D11: Hardening & Deployment
-- Finalize production Nginx + API proxy setup, verify no secrets in frontend.
-EOF
-git add harness-dashboard-implementation-plan.md
-git commit -m "docs: replace old dashboard implementation plan with detailed architecture-aligned plan" -m "Co-Authored-By: Claude Code <noreply@anthropic.com>"
