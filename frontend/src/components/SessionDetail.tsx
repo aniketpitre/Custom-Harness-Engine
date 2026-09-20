@@ -15,7 +15,14 @@ export const SessionDetail = ({ sessionId }: { sessionId: string }) => {
     return (
         <div>
             <h2>Stream: {sessionId}</h2>
-            <pre>{JSON.stringify(events, null, 2)}</pre>
+            {events.map((e, index) => (
+                <div key={index} style={{ border: '1px solid #ccc', margin: '5px', padding: '5px' }}>
+                    <strong>{e.type}</strong>
+                    {e.receipt?.verification?.passed === false && <span style={{ color: 'red' }}> [Risk: ALERT]</span>}
+                    {e.type === 'tool_result' && <span>Tier: {e.policy_tier || 'N/A'}</span>}
+                    <pre>{JSON.stringify(e, null, 2)}</pre>
+                </div>
+            ))}
         </div>
     );
 };
