@@ -404,3 +404,15 @@ Completed:
 
 Remaining:
 - None. Phase 17 is complete.
+
+## Dashboard Implementation
+
+| Phase | Description | Status |
+| :--- | :--- | :--- |
+| 18 | Frontend Scaffolding & Setup | 🔵 TODO |
+| 19 | Session Registry UI | 🔵 TODO |
+| 20 | Live Event Streaming | 🔵 TODO |
+| 21 | Security & Budgeting Visualization | 🔵 TODO |
+| 22 | Agent Steering & Interruption Interface | 🔵 TODO |
+| 23 | Memory Consolidation & Receipt Inspector | 🔵 TODO |
+| 24 | Dashboard Hardening & Deployment | 🔵 TODO |
