@@ -1,3 +1,5 @@
+import { motion } from "motion/react";
+
 export const Layout = ({ children }: { children: React.ReactNode }) => (
   <div className="flex bg-slate-950 text-slate-100 min-h-screen">
     {/* Sidebar */}
@@ -10,8 +12,13 @@ export const Layout = ({ children }: { children: React.ReactNode }) => (
       </ul>
     </nav>
     {/* Main */}
-    <main className="flex-1 p-8">
+    <motion.main
+        className="flex-1 p-8"
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.3 }}
+    >
       {children}
-    </main>
+    </motion.main>
   </div>
 );
