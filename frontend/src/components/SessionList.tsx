@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
+import { SessionDetail } from './SessionDetail';
 
 export const SessionList = () => {
-    const [sessions, setSessions] = useState([]);
+    const [sessions, setSessions] = useState<any[]>([]);
+    const [selectedId, setSelectedId] = useState<string | null>(null);
 
     useEffect(() => {
-        // NOTE: Harness API might need explicit handling if list endpoint is different
-        // Assuming GET /sessions returns a list
         fetch('http://localhost:8000/sessions')
             .then(res => res.json())
             .then(data => setSessions(data))
@@ -17,11 +17,12 @@ export const SessionList = () => {
             <h2>Active Sessions</h2>
             <ul>
                 {sessions.map((s: any) => (
-                    <li key={s.session_id}>
+                    <li key={s.session_id} onClick={() => setSelectedId(s.session_id)}>
                         {s.goal} - {s.status}
                     </li>
                 ))}
             </ul>
+            {selectedId && <SessionDetail sessionId={selectedId} />}
         </div>
     );
 };
