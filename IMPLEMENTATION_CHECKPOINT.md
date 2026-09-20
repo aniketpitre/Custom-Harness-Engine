@@ -414,5 +414,5 @@ Remaining:
 | 20 | Live Event Streaming | ✅ DONE |
 | 21 | Security & Budgeting Visualization | ✅ DONE |
 | 22 | Agent Steering & Interruption Interface | ✅ DONE |
-| 23 | Memory Consolidation & Receipt Inspector | 🔵 TODO |
-| 24 | Dashboard Hardening & Deployment | 🔵 TODO |
+| 23 | Memory Consolidation & Receipt Inspector | ✅ DONE |
+| 24 | Dashboard Hardening & Deployment | ✅ DONE |
