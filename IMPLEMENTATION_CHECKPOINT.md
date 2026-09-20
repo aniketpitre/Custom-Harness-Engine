@@ -40,7 +40,7 @@ The implementation sequence is documented in `harness-engine-implementation-plan
 | 14    | Unified Control Plane & API    | ✅ DONE           | —                                                                |
 | 15    | Event Streaming & Interactive  | ✅ DONE           | —                                                                |
 | 16    | Context | 16    | Context & Execution Hardening  | ⏳ PENDING        | Implement large output spilling, budgets, generic tool expansion | Execution Hardening  | ✅ DONE           | —                                                                |
-| 17    | Background Infrastructure      | ⏳ PENDING        | Implement APScheduler cron, Memory dreaming, Advisor sub-model   |
+| 17    | Background Infrastructure      | ✅ DONE           | —                                                                |
 
 ### What a new session should do next
 
@@ -384,3 +384,23 @@ Features:
 
 Remaining:
 - None. Phase 16 is complete.
+
+### Phase 17: Background Infrastructure
+
+Implementation complete.
+
+Files:
+- `core/background/scheduler.py`: Handles scheduling via APScheduler.
+- `core/gateway/api.py`: Exposes `POST /cron` to dynamically add cron schedules, and `POST /memory/dream` to trigger consolidation.
+- `core/memory/dreamer.py`: Analyzes active configurations in memory and aggregates thematic concepts.
+- `core/gateway/webhooks.py`: Propagates outgoing payloads back to defined systems.
+- `core/agent_engine.py`: Defines the `advisor_consultation` tool for primary agents to query the LLM dynamically during mid-execution.
+
+Completed:
+- Background Agents execution pipeline securely wrapped around `apscheduler` and isolated DB sessions.
+- Asynchronous webhook payloads reliably catch application success/failure boundaries, firing HTTP requests to `HARNESS_WEBHOOK_ENDPOINTS`.
+- Memory dreaming accurately retrieves generic/devops memory subsets and compiles dense technical configurations correctly, dropping identical subsets automatically.
+- Advisor tool accurately delegates secondary context and queries to `HARNESS_ADVISOR_MODEL` (fallback to primary) safely yielding guidance inline.
+
+Remaining:
+- None. Phase 17 is complete.
