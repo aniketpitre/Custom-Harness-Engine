@@ -19,7 +19,7 @@ The implementation sequence is documented in `harness-engine-implementation-plan
 
 ## Quick Status (2026-09-20)
 
-**Test suite: 64 passed, 0 failed** (`python3 -m pytest tests/ -k "not test_phase10_real" -v`)
+**Test suite: 65 passed, 0 failed** (`python3 -m pytest tests/ -k "not test_phase10_real" -v`)
 
 | Phase | Name                           | Status           | Remaining                                                        |
 |-------|--------------------------------|------------------|------------------------------------------------------------------|
@@ -38,7 +38,7 @@ The implementation sequence is documented in `harness-engine-implementation-plan
 | 12    | Orchestration layer            | ✅ DONE           | —                                                                |
 | 13    | Hardening                      | ✅ DONE (in code) | —                                                                |
 | 14    | Unified Control Plane & API    | ✅ DONE           | —                                                                |
-| 15    | Event Streaming & Interactive  | ⏳ PENDING        | Implement SSE capability and mid-task user.interrupt steering    |
+| 15    | Event Streaming & Interactive  | ✅ DONE           | —                                                                |
 | 16    | Context & Execution Hardening  | ⏳ PENDING        | Implement large output spilling, budgets, generic tool expansion |
 | 17    | Background Infrastructure      | ⏳ PENDING        | Implement APScheduler cron, Memory dreaming, Advisor sub-model   |
 

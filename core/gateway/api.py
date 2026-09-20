@@ -5,11 +5,12 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from core.registry import AgentRegistry
-from core.memory.store import init_db, create_session, get_session, update_session
-from core.agent_engine import run_agent
+from core.memory.store import init_db, create_session, get_session, update_session, set_session_interruption
+from core.agent_engine import run_agent, run_agent_generator
 from core.primitives.goal import Goal, TriggerSource
 from core.primitives.context import ContextPacket
 from core.primitives.execution import RunReceipt
@@ -120,12 +121,7 @@ def start_session(req: CreateSessionRequest, background_tasks: BackgroundTasks):
     finally:
         conn.close()
 
-    background_tasks.add_task(
-        execute_session,
-        session_id=session_id,
-        agent_id=req.agent_id,
-        goal_text=req.goal
-    )
+    # Removed BackgroundTasks for Phase 15. The client initiates streaming by calling GET /stream
 
     return {"session_id": session_id, "status": "pending"}
 
@@ -142,3 +138,89 @@ def retrieve_session(session_id: str):
         raise HTTPException(status_code=404, detail="Session not found")
 
     return session
+
+class InterruptRequest(BaseModel):
+    message: str
+
+@app.post("/sessions/{session_id}/interrupt")
+def interrupt_session(session_id: str, req: InterruptRequest):
+    conn = init_db()
+    try:
+        session = get_session(conn, session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        set_session_interruption(conn, session_id, req.message)
+    finally:
+        conn.close()
+    return {"status": "interruption_queued"}
+
+@app.get("/sessions/{session_id}/stream")
+async def stream_session(session_id: str):
+    conn = init_db()
+    try:
+        session = get_session(conn, session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        if session["status"] not in ("pending", "running"):
+            raise HTTPException(status_code=400, detail="Session already completed")
+            
+        update_session(conn, session_id, "running")
+        context = build_context(session["goal"], conn)
+        goal = context.goal
+        
+        agent_profile = registry.get_agent(session["agent_id"])
+        if not agent_profile:
+            update_session(conn, session_id, "failure")
+            raise HTTPException(status_code=404, detail="Agent not found")
+    finally:
+        conn.close()
+
+    async def sse_generator():
+        try:
+            async for event in run_agent_generator(
+                session_id=session_id,
+                context=context,
+                allowed_tools=agent_profile.allowed_tools,
+                agent_profile=agent_profile
+            ):
+                if event["type"] == "final_receipt":
+                    # Update DB
+                    conn = init_db()
+                    try:
+                        receipt_dict = event["receipt"]
+                        verification = receipt_dict.get("verification")
+                        
+                        receipt = RunReceipt(
+                            run_id=session_id,
+                            goal=goal,
+                            agent_id=session["agent_id"],
+                            model_used=receipt_dict.get("model_used", agent_profile.model or "unknown"),
+                            actions=receipt_dict.get("actions", []),
+                            final_text=receipt_dict.get("final_text", ""),
+                            status="success" if getattr(verification, "passed", True) else "failure",
+                            verification=verification,
+                            started_at=goal.created_at,
+                            finished_at=datetime.now(timezone.utc),
+                        )
+                        receipt.candidate_skill = draft_skill_if_warranted(receipt)
+                        update_session(conn, session_id, status=receipt.status, run_receipt=json.loads(receipt.model_dump_json()))
+                    finally:
+                        conn.close()
+                    # Strip raw events from SSE stream to avoid serialization errors of LiteLLM MockResponse
+                    event_to_yield = dict(event)
+                    if "receipt" in event_to_yield and "events" in event_to_yield["receipt"]:
+                        receipt_copy = dict(event_to_yield["receipt"])
+                        receipt_copy["events"] = []
+                        event_to_yield["receipt"] = receipt_copy
+                    yield f"data: {json.dumps(event_to_yield)}\n\n"
+                else:
+                    yield f"data: {json.dumps(event)}\n\n"
+        except Exception as e:
+            conn = init_db()
+            try:
+                update_session(conn, session_id, "failure")
+            finally:
+                conn.close()
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(sse_generator(), media_type="text/event-stream")

@@ -199,7 +199,12 @@ def test_api_full_session_lifecycle(override_agents, temp_db, monkeypatch):
     session_id = response.json()["session_id"]
     assert response.json()["status"] == "pending"
 
-    # 2. Retrieve — TestClient runs BackgroundTasks synchronously
+    # 1.5 Manually trigger execution since Phase 15 removed BackgroundTasks
+    import asyncio
+    from core.gateway.api import execute_session
+    asyncio.run(execute_session(session_id, "test_agent", "Test goal 123"))
+
+    # 2. Retrieve 
     response = client.get(f"/sessions/{session_id}")
     assert response.status_code == 200
     data = response.json()

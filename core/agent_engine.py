@@ -196,7 +196,10 @@ DEVOPS_ACTION_TOOLS = [
 
 from core.primitives.agent import AgentProfile
 
-async def run_agent(context: ContextPacket, allowed_tools: list[str], agent_profile: AgentProfile | None = None) -> dict[str, Any]:
+from core.memory.store import init_db, get_and_clear_interruption
+from typing import AsyncGenerator
+
+async def run_agent_generator(session_id: str | None, context: ContextPacket, allowed_tools: list[str], agent_profile: AgentProfile | None = None) -> AsyncGenerator[dict[str, Any], None]:
     with tracer.start_as_current_span("harness_agent_run") as span:
         span.set_attribute("agent.goal", context.goal.raw_input)
         span.set_attribute("agent.domain", context.goal.domain)
@@ -219,47 +222,75 @@ async def run_agent(context: ContextPacket, allowed_tools: list[str], agent_prof
         events: list[Any] = []
         actions: list[ActionRecord] = []
     
-        for _ in range(8):
-            span.add_event(f"llm_completion_turn_{_}", {"turn_number": _})
-            response = await litellm.acompletion(
-                model=model,
-                api_key=api_key,
-                messages=messages,
-                tools=tools or None,
-                tool_choice="auto" if tools else None,
-            )
-            events.append(response)
-            message = response.choices[0].message
-            tool_calls = getattr(message, "tool_calls", None) or []
-            if not tool_calls:
-                return {
-                    "events": events,
-                    "final_text": getattr(message, "content", None) or "",
-                    "model_used": model,
-                    "actions": actions,
-                    "verification": _run_requested_verification(context),
-                }
-    
-            messages.append(_assistant_message(message, tool_calls))
-            for tool_call in tool_calls:
-                arguments = json.loads(tool_call.function.arguments or "{}")
-                tool_result, action = await _dispatch_tool(
-                    tool_call.id,
-                    tool_call.function.name,
-                    arguments,
-                    allowed_tools,
+        conn = init_db() if session_id else None
+        try:
+            for _ in range(8):
+                span.add_event(f"llm_completion_turn_{_}", {"turn_number": _})
+                
+                if conn and session_id:
+                    interruption = get_and_clear_interruption(conn, session_id)
+                    if interruption:
+                        messages.append({"role": "user", "content": f"User Interruption: {interruption}"})
+                        yield {"type": "interruption_received", "content": interruption}
+                
+                response = await litellm.acompletion(
+                    model=model,
+                    api_key=api_key,
+                    messages=messages,
+                    tools=tools or None,
+                    tool_choice="auto" if tools else None,
                 )
-                actions.append(action)
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": tool_result,
+                events.append(response)
+                message = response.choices[0].message
+                tool_calls = getattr(message, "tool_calls", None) or []
+                if not tool_calls:
+                    yield {"type": "message", "content": getattr(message, "content", None) or ""}
+                    yield {
+                        "type": "final_receipt",
+                        "receipt": {
+                            "events": events.copy(),
+                            "final_text": getattr(message, "content", None) or "",
+                            "model_used": model,
+                            "actions": actions,
+                            "verification": _run_requested_verification(context),
+                        }
                     }
-                )
-    
-        span.set_status(trace.Status(trace.StatusCode.ERROR, "Max tool turns exceeded"))
-        raise RuntimeError("Grok exceeded the maximum number of tool turns (8)")
+                    return
+        
+                messages.append(_assistant_message(message, tool_calls))
+                if getattr(message, "content", None):
+                    yield {"type": "message", "content": message.content}
+                    
+                for tool_call in tool_calls:
+                    yield {"type": "tool_call", "name": tool_call.function.name, "arguments": json.loads(tool_call.function.arguments or "{}")}
+                    arguments = json.loads(tool_call.function.arguments or "{}")
+                    tool_result, action = await _dispatch_tool(
+                        tool_call.id,
+                        tool_call.function.name,
+                        arguments,
+                        allowed_tools,
+                    )
+                    actions.append(action)
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": tool_result,
+                        }
+                    )
+                    yield {"type": "tool_result", "name": tool_call.function.name, "result_summary": tool_result[:256] + ("..." if len(tool_result) > 256 else "")}
+        
+            span.set_status(trace.Status(trace.StatusCode.ERROR, "Max tool turns exceeded"))
+            raise RuntimeError("Grok exceeded the maximum number of tool turns (8)")
+        finally:
+            if conn:
+                conn.close()
+
+async def run_agent(context: ContextPacket, allowed_tools: list[str], agent_profile: AgentProfile | None = None) -> dict[str, Any]:
+    async for event in run_agent_generator(None, context, allowed_tools, agent_profile):
+        if event["type"] == "final_receipt":
+            return event["receipt"]
+    raise RuntimeError("Agent terminated without producing a final receipt")
 
 
 def _build_prompt(context: ContextPacket) -> str:

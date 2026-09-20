@@ -1,4 +1,5 @@
 import os
+import os
 import pytest
 import asyncio
 from unittest.mock import patch, AsyncMock
@@ -9,8 +10,19 @@ from core.agent_engine import run_agent
 import time
 import subprocess
 
-os.environ["VAULT_ADDR"] = "http://127.0.0.1:8200"
-os.environ["VAULT_TOKEN"] = "c6869775842d732f69f590ac45ec422847ca27ffa15a9bf9b45719437a6803f4"
+@pytest.fixture(autouse=True)
+def vault_env():
+    """Ensure vault env vars exist."""
+    old_addr = os.environ.get("VAULT_ADDR")
+    old_token = os.environ.get("VAULT_TOKEN")
+
+    os.environ["VAULT_ADDR"] = "http://127.0.0.1:8200"
+    os.environ["VAULT_TOKEN"] = "c6869775842d732f69f590ac45ec422847ca27ffa15a9bf9b45719437a6803f4"
+
+    yield
+
+    if old_addr: os.environ["VAULT_ADDR"] = old_addr
+    if old_token: os.environ["VAULT_TOKEN"] = old_token
 
 @pytest.mark.asyncio
 @patch("core.agent_engine.request_approval", new_callable=AsyncMock)
@@ -65,6 +77,7 @@ async def test_gitops_live_pr_creation(mock_push, mock_get_approver, mock_reques
     assert "https://github.com/mock/repo/pull/1" in action.raw_result
 
     # Cleanup the files GitPython created for us to keep workspace green
+    subprocess.run(["git", "checkout", "main"], capture_output=True)
     current_branch = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True).stdout.strip()
     assert current_branch == "main"
     subprocess.run(["git", "branch", "-D", new_branch_name])

@@ -57,6 +57,7 @@ def init_db(db_path: str | Path = DB_PATH) -> sqlite3.Connection:
         END;
 
         
+
         CREATE TABLE IF NOT EXISTS sessions (
             id TEXT PRIMARY KEY,
             agent_id TEXT NOT NULL,
@@ -64,9 +65,11 @@ def init_db(db_path: str | Path = DB_PATH) -> sqlite3.Connection:
             status TEXT NOT NULL,
             environment JSON,
             run_receipt JSON,
+            interruption_payload TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
+
         CREATE TABLE IF NOT EXISTS workflow_checkpoints (
             workflow_id TEXT,
             phase_index INTEGER,
@@ -221,3 +224,33 @@ def update_session(conn: sqlite3.Connection, session_id: str, status: str, run_r
         (status, json.dumps(run_receipt) if run_receipt else None, now, session_id)
     )
     conn.commit()
+
+
+def set_session_interruption(conn: sqlite3.Connection, session_id: str, message: str) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        '''
+        UPDATE sessions
+        SET interruption_payload = ?, updated_at = ?
+        WHERE id = ?
+        ''',
+        (message, now, session_id)
+    )
+    conn.commit()
+
+def get_and_clear_interruption(conn: sqlite3.Connection, session_id: str) -> str | None:
+    row = conn.execute("SELECT interruption_payload FROM sessions WHERE id = ?", (session_id,)).fetchone()
+    if row and row["interruption_payload"]:
+        payload = row["interruption_payload"]
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            '''
+            UPDATE sessions
+            SET interruption_payload = NULL, updated_at = ?
+            WHERE id = ?
+            ''',
+            (now, session_id)
+        )
+        conn.commit()
+        return payload
+    return None
