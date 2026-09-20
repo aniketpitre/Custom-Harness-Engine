@@ -367,3 +367,20 @@ Note on mocking: The `test_api_full_session_lifecycle` test mocks `run_agent` to
 Remaining:
 
 - None. Phase 14 is complete.
+
+### Phase 16: Context & Execution Hardening
+
+Implementation and complete test suite integration successfully completed.
+
+Files:
+- `core/agent_engine.py`: Spilled output tracking, context budgeting, iterative async enforcement.
+- `domains/generic/tools.py`: Bounded search, fetch, and extraction utility suite.
+- `tests/test_phase16_hardening.py`: Strict token bounds tests, memory spill generation tests, and valid generic tool execution constraints tests.
+
+Features:
+- `_spill_if_needed`: Extracts large console logs directly to `.workspace/spill/` to prevent single-request explosion.
+- Strict token tracking across SSE streams: Protects the agent loop from unhinged recursion by stopping operations at `200000` tokens exactly.
+- Added generic standard file editing and parsing capability array properly mapped to standard R1 Risk Tier limits.
+
+Remaining:
+- None. Phase 16 is complete.
