@@ -1,69 +1,69 @@
 # Harness Engine
 
-Harness Engine is a general-purpose, agentic execution and learning runtime designed to safely bridge high-level goals with verified, actionable outcomes. While initially architected with a DevOps domain pack, the engine is designed for cross-domain functional extensibility (Coding, Research, Data).
+Harness Engine is a general-purpose, agentic execution and learning runtime engineered to bridge high-level operational goals with verified, actionable outcomes. Unlike generic agentic frameworks, it is built with a "Safety & Observability First" philosophy, bridging the gap between autonomous utility and production-grade reliability.
 
-## Architecture
+## Why Harness Engine is Different
 
-The Harness Engine follows a rigorous execution pipeline:
+- **Policy-Tiered Execution (R0–R4)**: Every tool action is validated against a dynamic risk table before execution. R0 is read-only; destructive or production modifications (R2-R3) trigger mandatory human-in-the-loop approval gates via secondary channels (e.g., Telegram).
+- **Verifiable Execution Loop**: Every operation produces a immutable `RunReceipt`. Verification gates explicitly validate outcomes against expected state (e.g., K8s pod liveness, configuration targets) *before* marking a goal complete, eliminating hallucinated success.
+- **Robust Iterative Learning**: Successful verification outcomes automatically promote candidate tools/workflows to validated "Skills" (`SKILL.md` format), building an persistent organic toolset in real-time.
+- **Production-Grade Hardening**: Built for high-stakes environments with built-in token budgeting, automated output-log spilling (`.workspace/spill/`), anomaly rollback mechanisms, and automated memory consolidation ("Dreams").
+- **Hermes-Style Observability**: Integrated real-time dashboard provides terminal-native visibility into the live agent pipeline, featuring SSE event streaming, budget gauges, and adversarial cross-check status (Phase 0–24 implementation).
+
+## Core Architecture
+
+The Harness Engine follows a rigorous, non-linear execution pipeline:
 
 ```text
-GOAL → CONTEXT → AGENT → POLICY → EXECUTE → VERIFY → RECEIPT → LEARN → MEMORY
+GOAL → CONTEXT → AGENT → POLICY → APPROVAL → EXECUTE → VERIFY → RECEIPT → LEARN → MEMORY
 ```
 
 ### Key Pillars
-*   **Safety First**: Built-in Risk Tiering (R0–R4), mandatory human-in-the-loop approval gates (for R2+ actions), and automated anomaly/rollback mechanisms.
-*   **Verifiable Execution**: Every action produces a `RunReceipt`, which is validated by an automated verification gate, ensuring agents do not hallucinate outcomes.
-*   **Iterative Learning**: Successful, verified workflows are promoted to validated "Skills" that the agent can reuse in future sessions.
-*   **Operational Hardening**: Middleware for token budgeting, output spilling (for large logs/traces), and secure sandbox environment management.
+*   **Safety**: Built-in Risk Tiering prevents unauthorized actions.
+*   **Verifiable Execution**: `RunReceipts` ensure outcomes match goals.
+*   **Iterative Learning**: Automated skill promotion loop.
+*   **Observability**: Real-time integration via SSE event streaming.
 
-## Project Status
+## Implementation Status (Phases 0–24)
 
-All phases (0-17) defined in the implementation plan have been completed and verified.
+### Phases 0–17: Core Runtime & Infrastructure
+Completed core primitives, agent loop, DevOps packs, observability, interactive webhooks, and background infrastructure (scheduler, advisor, dreamer).
 
-| Phase | Description | Status |
-| :--- | :--- | :--- |
-| 0-14 | Core Primitives, Agent Loop, Policy, DevOps Pack, Observability, API | ✅ DONE |
-| 15 | Event Streaming & Interactivity | ✅ DONE |
-| 16 | Context & Execution Hardening | ✅ DONE |
-| 17 | Background Infrastructure (Scheduler, Dreams, Advisor, Webhooks) | ✅ DONE |
+### Phases 18–24: Dashboard Implementation
+Complete Hermes-style dashboard featuring:
+- **Terminal-Native Layout**: Dark, dense, high-velocity stream visualization.
+- **Real-time Steering**: Interactive interruption and session steering.
+- **Advanced Observability**: Security/Budget gauges, Memory Dream visualizer, and Verification inspector.
+
+*See `IMPLEMENTATION_CHECKPOINT.md` for status.*
 
 ## Getting Started
 
 ### Prerequisites
-*   Python 3.12+
-*   Docker/Docker Compose (for Vault development instance)
-*   HashiCorp Vault installed and accessible.
+- Python 3.12+
+- Docker & Docker Compose
+- HashiCorp Vault (accessible, with tokens)
 
 ### Setup
-1.  **Repository**:
-    ```bash
-    git clone <repository-url>
-    cd harness-engine
-    python3 -m venv .venv
-    source .venv/bin/activate
-    pip install -e .
-    ```
-2.  **Environment**:
-    Load necessary environment variables (see `.env.example`).
-3.  **Secrets (Vault)**:
-    Ensure Vault is running and seeded with required secrets (Groq API, Telegram tokens, Kubernetes config). The application expects `VAULT_ADDR` and `VAULT_TOKEN` to be set in the runtime environment.
+1. **Clone & Install**:
+   ```bash
+   git clone <repo>
+   cd harness-engine
+   source .venv/bin/activate
+   pip install -e .
+   ```
+2. **Environment**: Configure `.env` based on `.env.example`.
+3. **Vault**: Ensure Vault is seeded with Groq/Telegram/Kubernetes secrets.
 
-### Running the System
-The Harness Engine operates primarily via its API Gateway:
-```bash
-uvicorn core.gateway.api:app --reload
-```
-You can interact via the documented endpoints (`POST /sessions`, `POST /cron`, `GET /stream`, etc.).
-
-## Implementation Plan Trace
-
-The full sequence of implementation (Phases 0–17) is tracked in `harness-engine-implementation-plan.md`. Detailed status and check-off for every step is maintained in `IMPLEMENTATION_CHECKPOINT.md`.
-
-## Testing
-The system includes a comprehensive test suite (74+ tests) covering primitives, policy logic, domain-specific tools (Kubernetes/ArgoCD), event streaming, hardening mechanisms, and background infrastructure.
-```bash
-python3 -m pytest tests/ -v
-```
+### Running
+- **API**: `uvicorn core.gateway.api:app --reload`
+- **Dashboard (Frontend)**:
+  ```bash
+  cd frontend
+  npm install
+  npm run dev
+  ```
+  *(Then visit `http://localhost:5173`)*
 
 ---
-*For architectural details, refer to `general_purpose_agent_harness_architecture.md`.*
+*For technical details, see `general_purpose_agent_harness_architecture.md`.*
