@@ -1,3 +1,5 @@
+from core.gateway.webhooks import dispatch_webhook
+import asyncio
 import asyncio
 import uuid
 import json
@@ -21,6 +23,31 @@ from core.primitives.learning import draft_skill_if_warranted
 app = FastAPI(title="Harness Engine Control Plane API")
 registry = AgentRegistry()
 
+
+
+class CreateCronRequest(BaseModel):
+    cron: str
+    agent_id: str
+    goal: str
+    environment: Dict[str, str] = {}
+
+from core.background.scheduler import start_scheduler, add_agent_cron_job
+
+@app.on_event("startup")
+def startup_event():
+    start_scheduler()
+
+@app.post("/cron", status_code=201)
+def create_cron(req: CreateCronRequest):
+    agent = registry.get_agent(req.agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+        
+    try:
+        job_id = add_agent_cron_job(req.cron, req.agent_id, req.goal, req.environment)
+        return {"job_id": job_id, "status": "scheduled"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 class CreateSessionRequest(BaseModel):
     agent_id: str
@@ -77,14 +104,17 @@ async def execute_session(session_id: str, agent_id: str, goal_text: str):
         receipt.candidate_skill = draft_skill_if_warranted(receipt)
 
         # Update database with final transaction state
+        receipt_dict = json.loads(receipt.model_dump_json())
         update_session(
             conn,
             session_id,
             status=receipt.status,
-            run_receipt=json.loads(receipt.model_dump_json())
+            run_receipt=receipt_dict
         )
+        asyncio.create_task(dispatch_webhook(session_id, receipt.status, receipt_dict))
     except Exception as e:
         update_session(conn, session_id, "failure")
+        asyncio.create_task(dispatch_webhook(session_id, "failure"))
     finally:
         conn.close()
 
@@ -203,7 +233,9 @@ async def stream_session(session_id: str):
                             finished_at=datetime.now(timezone.utc),
                         )
                         receipt.candidate_skill = draft_skill_if_warranted(receipt)
-                        update_session(conn, session_id, status=receipt.status, run_receipt=json.loads(receipt.model_dump_json()))
+                        receipt_dict_dump = json.loads(receipt.model_dump_json())
+                        update_session(conn, session_id, status=receipt.status, run_receipt=receipt_dict_dump)
+                        asyncio.create_task(dispatch_webhook(session_id, receipt.status, receipt_dict_dump))
                     finally:
                         conn.close()
                     # Strip raw events from SSE stream to avoid serialization errors of LiteLLM MockResponse
@@ -219,6 +251,7 @@ async def stream_session(session_id: str):
             conn = init_db()
             try:
                 update_session(conn, session_id, "failure")
+                asyncio.create_task(dispatch_webhook(session_id, "failure"))
             finally:
                 conn.close()
             raise
@@ -226,8 +259,17 @@ async def stream_session(session_id: str):
             conn = init_db()
             try:
                 update_session(conn, session_id, "failure")
+                asyncio.create_task(dispatch_webhook(session_id, "failure"))
             finally:
                 conn.close()
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
     return StreamingResponse(sse_generator(), media_type="text/event-stream")
+
+
+from core.memory.dreamer import run_memory_consolidation
+
+@app.post("/memory/dream")
+async def trigger_memory_dream():
+    themes = await run_memory_consolidation()
+    return {"status": "success", "consolidated_themes": themes or []}

@@ -219,6 +219,45 @@ GENERIC_TOOLS = [
     }
 ]
 
+
+ADVISOR_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "advisor_consultation",
+            "description": "Pause your current reasoning to securely consult a secondary, specialized Advisor model for strategic guidance or deeper analysis on a specific context problem.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "context": {"type": "string"}
+                },
+                "required": ["query", "context"],
+                "additionalProperties": False,
+            },
+        },
+    }
+]
+
+async def _dispatch_advisor_tool(query: str, context: str) -> str:
+    import litellm
+    import os
+    from core.secrets import get_secret
+    
+    model_name = os.getenv("HARNESS_ADVISOR_MODEL") or os.getenv("HARNESS_MODEL") or "groq/openai/gpt-oss-120b"
+    api_key = get_secret("groq", "api_key")
+    
+    prompt = f"You are the Harness Strategy Advisor sub-model. The Primary Execution Agent has paused its task to consult you.\n\nContext provided:\n{context}\n\nAgent's Query:\n{query}\n\nProvide direct, sharp strategic advice on how the agent should proceed."
+    
+    response = await litellm.acompletion(
+        model=model_name,
+        api_key=api_key,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    
+    return "Advisor says: " + response.choices[0].message.content
+
+
 DEVOPS_ACTION_TOOLS = [
     {
         "type": "function",
@@ -319,6 +358,8 @@ async def run_agent_generator(session_id: str | None, context: ContextPacket, al
             tools.extend(DEVOPS_ACTION_TOOLS)
         if "Generic" in allowed_tools:
             tools.extend(GENERIC_TOOLS)
+        if "Advisor" in allowed_tools:
+            tools.extend(ADVISOR_TOOLS)
         events: list[Any] = []
         actions: list[ActionRecord] = []
     
@@ -567,6 +608,15 @@ async def _dispatch_tool(
             policy_decision,
             result,
         )
+
+    if name == "advisor_consultation":
+        if "Advisor" not in allowed_tools:
+            raise PermissionError(f"Tool is not allowed: {name}")
+        result = await _dispatch_advisor_tool(arguments["query"], arguments["context"])
+        from core.primitives.policy import RiskTier
+        policy_decision = PolicyDecision(tool="advisor", action=name, decision="ALLOW", risk_tier=RiskTier.R1, reason="Advisor tool dispatch.")
+        result_spilled = _spill_if_needed(result, session_id, name)
+        return result_spilled, _action_record(policy_decision, result_spilled)
 
     if name in {"grep", "glob", "edit", "web_fetch", "web_search"}:
         if "Generic" not in allowed_tools:

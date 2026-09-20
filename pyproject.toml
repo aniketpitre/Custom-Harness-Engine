@@ -19,6 +19,8 @@ dependencies = [
     "opentelemetry-exporter-otlp",
     "fastapi",
     "uvicorn",
+    "apscheduler",
+    "httpx",
     "pytest",
     "pytest-asyncio",
     "pyyaml",
