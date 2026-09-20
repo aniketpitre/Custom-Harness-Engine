@@ -410,7 +410,7 @@ Remaining:
 | Phase | Description | Status |
 | :--- | :--- | :--- |
 | 18 | Frontend Scaffolding & Setup | ✅ DONE |
-| 19 | Session Registry UI | 🔵 TODO |
+| 19 | Session Registry UI | ✅ DONE |
 | 20 | Live Event Streaming | 🔵 TODO |
 | 21 | Security & Budgeting Visualization | 🔵 TODO |
 | 22 | Agent Steering & Interruption Interface | 🔵 TODO |
