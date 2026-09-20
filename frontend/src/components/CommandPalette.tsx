@@ -1,26 +1,42 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 
-export const CommandPalette = () => {
-    const [open, setOpen] = useState(false);
+export function CommandPalette() {
+  const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
 
-    useEffect(() => {
-        const handler = (e: KeyboardEvent) => {
-            if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                setOpen(p => !p);
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-lg bg-slate-900 p-4 border border-slate-700 shadow-xl">
+        <input 
+          autoFocus
+          className="w-full bg-transparent border-b border-slate-700 p-2 text-white outline-none"
+          placeholder="Search commands..."
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              navigate('/');
+              setIsOpen(false);
             }
-        };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, []);
-
-    if (!open) return null;
-    return (
-        <div className="fixed inset-0 bg-black/50 flex justify-center pt-20">
-            <div className="bg-slate-900 w-96 p-4 border border-slate-700 rounded shadow-xl">
-                 <h3 className="text-slate-400 mb-2">Actions</h3>
-                 <button className="block w-full text-left p-2 hover:bg-slate-800">Interrupt Run</button>
-            </div>
+          }}
+        />
+        <div className="mt-2 space-y-1">
+          <button onClick={() => { navigate('/'); setIsOpen(false); }} className="block w-full text-left p-2 hover:bg-slate-800 rounded">Go to Overview</button>
+          <button onClick={() => { navigate('/runs'); setIsOpen(false); }} className="block w-full text-left p-2 hover:bg-slate-800 rounded">Go to Runs</button>
         </div>
-    );
-};
+      </div>
+    </div>
+  );
+}
