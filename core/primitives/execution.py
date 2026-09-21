@@ -37,3 +37,4 @@ class RunReceipt(BaseModel):
     status: str = Field(pattern="^(running|success|failure|blocked)$", default="running")
     started_at: datetime
     finished_at: datetime | None = None
+    teardown_tasks: list[str] = Field(default_factory=list)

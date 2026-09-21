@@ -1,8 +1,38 @@
 import json
 import os
+import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import AsyncGenerator, Callable, Any, Optional
+
+# Phase 18: Temporal Composability - Effect Ownership
+class EffectStack:
+    def __init__(self):
+        self._stack = []
+
+    def push(self, invoker: str, disposer: Callable[[], Any]):
+        self._stack.append((invoker, disposer))
+
+    async def rollback(self):
+        while self._stack:
+            invoker, disposer = self._stack.pop()
+            try:
+                if asyncio.iscoroutinefunction(disposer):
+                    await disposer()
+                else:
+                    disposer()
+            except Exception as e:
+                print(f"Error rolling back effect from {invoker}: {e}")
+
+class EffectScope:
+    def __init__(self):
+        self.stack = EffectStack()
+
+    async def __aenter__(self):
+        return self.stack
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.stack.rollback()
 
 import litellm
 
@@ -243,18 +273,18 @@ async def _dispatch_advisor_tool(query: str, context: str) -> str:
     import litellm
     import os
     from core.secrets import get_secret
-    
+
     model_name = os.getenv("HARNESS_ADVISOR_MODEL") or os.getenv("HARNESS_MODEL") or "groq/openai/gpt-oss-120b"
     api_key = get_secret("groq", "api_key")
-    
+
     prompt = f"You are the Harness Strategy Advisor sub-model. The Primary Execution Agent has paused its task to consult you.\n\nContext provided:\n{context}\n\nAgent's Query:\n{query}\n\nProvide direct, sharp strategic advice on how the agent should proceed."
-    
+
     response = await litellm.acompletion(
         model=model_name,
         api_key=api_key,
         messages=[{"role": "user", "content": prompt}],
     )
-    
+
     return "Advisor says: " + response.choices[0].message.content
 
 
@@ -324,132 +354,136 @@ def _spill_if_needed(result: str, session_id: str | None, tag: str) -> str:
     MAX_LEN = 100_000
     if len(result) <= MAX_LEN:
         return result
-    
+
     workspace = Path(".workspace/spill")
     workspace.mkdir(parents=True, exist_ok=True)
     filename = f"{session_id or 'anon'}_{tag}_{int(datetime.now().timestamp())}.txt"
     filepath = workspace / filename
-    
+
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(result)
-        
+
     preview = result[:MAX_LEN // 2]
     return f"{preview}\n\n...[TRUNCATED. Full output saved to {filepath}]"
 
 async def run_agent_generator(session_id: str | None, context: ContextPacket, allowed_tools: list[str], agent_profile: AgentProfile | None = None) -> AsyncGenerator[dict[str, Any], None]:
-    with tracer.start_as_current_span("harness_agent_run") as span:
-        span.set_attribute("agent.goal", context.goal.raw_input)
-        span.set_attribute("agent.domain", context.goal.domain)
-        span.set_attribute("agent.trigger_source", context.goal.source.value)
-        model = (agent_profile.model if agent_profile and agent_profile.model else None) or os.getenv("HARNESS_MODEL") or os.getenv("GROK_MODEL") or "groq/openai/gpt-oss-120b"
-        api_key = get_secret("groq", "api_key")
-        sys_prompt = agent_profile.system_prompt if agent_profile else "You are an execution agent. Use available tools when they provide direct evidence for the goal."
-        messages: list[dict[str, Any]] = [
-            {
-                "role": "system",
-                "content": sys_prompt,
-            },
-            {"role": "user", "content": _build_prompt(context)},
-        ]
-        tools = [READ_DIRECTORY_TOOL] if "Read" in allowed_tools else []
-        if "DevOpsRead" in allowed_tools:
-            tools.extend(DEVOPS_READ_TOOLS)
-        if "DevOpsWrite" in allowed_tools:
-            tools.extend(DEVOPS_ACTION_TOOLS)
-        if "Generic" in allowed_tools:
-            tools.extend(GENERIC_TOOLS)
-        if "Advisor" in allowed_tools:
-            tools.extend(ADVISOR_TOOLS)
-        events: list[Any] = []
-        actions: list[ActionRecord] = []
-    
-        conn = init_db() if session_id else None
-        token_budget = 200_000 # default
-        total_tokens = 0
-        turn_count = 0
-        try:
-            while turn_count < 30 and total_tokens < token_budget:
-                span.add_event(f"llm_completion_turn_{turn_count}", {"turn_number": turn_count})
-                turn_count += 1
-                
-                if conn and session_id:
-                    interruption = get_and_clear_interruption(conn, session_id)
-                    if interruption:
-                        messages.append({"role": "user", "content": f"User Interruption: {interruption}"})
-                        yield {"type": "interruption_received", "content": interruption}
-                
-                response = await litellm.acompletion(
-                    model=model,
-                    api_key=api_key,
-                    messages=messages,
-                    tools=tools or None,
-                    tool_choice="auto" if tools else None,
-                )
-                events.append(response)
-                
-                # Phase 16.2 Token tracking
-                if hasattr(response, "usage") and response.usage:
-                    total_tokens += getattr(response.usage, "total_tokens", 0)
-                
-                if total_tokens >= token_budget:
-                    yield {"type": "message", "content": "Token budget exceeded."}
-                    yield {
-                        "type": "final_receipt",
-                        "receipt": {
-                            "events": events.copy(),
-                            "final_text": "Execution blocked: Token budget exceeded",
-                            "model_used": model,
-                            "actions": actions,
-                            "verification": None,
-                        }
-                    }
-                    return
+    effect_scope = EffectScope()
+    try:
+        with tracer.start_as_current_span("harness_agent_run") as span:
+            span.set_attribute("agent.goal", context.goal.raw_input)
+            span.set_attribute("agent.domain", context.goal.domain)
+            span.set_attribute("agent.trigger_source", context.goal.source.value)
+            model = (agent_profile.model if agent_profile and agent_profile.model else None) or os.getenv("HARNESS_MODEL") or os.getenv("GROK_MODEL") or "groq/openai/gpt-oss-120b"
+            api_key = get_secret("groq", "api_key")
+            sys_prompt = agent_profile.system_prompt if agent_profile else "You are an execution agent. Use available tools when they provide direct evidence for the goal."
+            messages: list[dict[str, Any]] = [
+                {
+                    "role": "system",
+                    "content": sys_prompt,
+                },
+                {"role": "user", "content": _build_prompt(context)},
+            ]
+            tools = [READ_DIRECTORY_TOOL] if "Read" in allowed_tools else []
+            if "DevOpsRead" in allowed_tools:
+                tools.extend(DEVOPS_READ_TOOLS)
+            if "DevOpsWrite" in allowed_tools:
+                tools.extend(DEVOPS_ACTION_TOOLS)
+            if "Generic" in allowed_tools:
+                tools.extend(GENERIC_TOOLS)
+            if "Advisor" in allowed_tools:
+                tools.extend(ADVISOR_TOOLS)
+            events: list[Any] = []
+            actions: list[ActionRecord] = []
 
-                message = response.choices[0].message
-                tool_calls = getattr(message, "tool_calls", None) or []
-                if not tool_calls:
-                    yield {"type": "message", "content": getattr(message, "content", None) or ""}
-                    yield {
-                        "type": "final_receipt",
-                        "receipt": {
-                            "events": events.copy(),
-                            "final_text": getattr(message, "content", None) or "",
-                            "model_used": model,
-                            "actions": actions,
-                            "verification": _run_requested_verification(context),
-                        }
-                    }
-                    return
-        
-                messages.append(_assistant_message(message, tool_calls))
-                if getattr(message, "content", None):
-                    yield {"type": "message", "content": message.content}
-                    
-                for tool_call in tool_calls:
-                    yield {"type": "tool_call", "name": tool_call.function.name, "arguments": json.loads(tool_call.function.arguments or "{}")}
-                    arguments = json.loads(tool_call.function.arguments or "{}")
-                    tool_result, action = await _dispatch_tool(
-                        tool_call.id,
-                        tool_call.function.name,
-                        arguments,
-                        allowed_tools,
-                        session_id,
+            conn = init_db() if session_id else None
+            token_budget = 200_000 # default
+            total_tokens = 0
+            turn_count = 0
+            try:
+                while turn_count < 30 and total_tokens < token_budget:
+                    span.add_event(f"llm_completion_turn_{turn_count}", {"turn_number": turn_count})
+                    turn_count += 1
+
+                    if conn and session_id:
+                        interruption = get_and_clear_interruption(conn, session_id)
+                        if interruption:
+                            messages.append({"role": "user", "content": f"User Interruption: {interruption}"})
+                            yield {"type": "interruption_received", "content": interruption}
+
+                    response = await litellm.acompletion(
+                        model=model,
+                        api_key=api_key,
+                        messages=messages,
+                        tools=tools or None,
+                        tool_choice="auto" if tools else None,
                     )
-                    actions.append(action)
-                    messages.append(
-                        {
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "content": tool_result,
+                    events.append(response)
+
+                    # Phase 16.2 Token tracking
+                    if hasattr(response, "usage") and response.usage:
+                        total_tokens += getattr(response.usage, "total_tokens", 0)
+
+                    if total_tokens >= token_budget:
+                        yield {"type": "message", "content": "Token budget exceeded."}
+                        yield {
+                            "type": "final_receipt",
+                            "receipt": {
+                                "events": events.copy(),
+                                "final_text": "Execution blocked: Token budget exceeded",
+                                "model_used": model,
+                                "actions": actions,
+                                "verification": None,
+                            }
                         }
-                    )
-                    yield {"type": "tool_result", "name": tool_call.function.name, "result_summary": tool_result[:256] + ("..." if len(tool_result) > 256 else "")}
-        
-            span.set_status(trace.Status(trace.StatusCode.ERROR, "Max tool turns exceeded"))
-            raise RuntimeError("Grok exceeded the maximum number of tool turns (8)")
-        finally:
-            if conn:
-                conn.close()
+                        return
+
+                    message = response.choices[0].message
+                    tool_calls = getattr(message, "tool_calls", None) or []
+                    if not tool_calls:
+                        yield {"type": "message", "content": getattr(message, "content", None) or ""}
+                        yield {
+                            "type": "final_receipt",
+                            "receipt": {
+                                "events": events.copy(),
+                                "final_text": getattr(message, "content", None) or "",
+                                "model_used": model,
+                                "actions": actions,
+                                "verification": _run_requested_verification(context),
+                            }
+                        }
+                        return
+
+                    messages.append(_assistant_message(message, tool_calls))
+                    if getattr(message, "content", None):
+                        yield {"type": "message", "content": message.content}
+
+                    for tool_call in tool_calls:
+                        yield {"type": "tool_call", "name": tool_call.function.name, "arguments": json.loads(tool_call.function.arguments or "{}")}
+                        arguments = json.loads(tool_call.function.arguments or "{}")
+                        tool_result, action = await _dispatch_tool(
+                            tool_call.id,
+                            tool_call.function.name,
+                            arguments,
+                            allowed_tools,
+                            session_id,
+                        )
+                        actions.append(action)
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "content": tool_result,
+                            }
+                        )
+                        yield {"type": "tool_result", "name": tool_call.function.name, "result_summary": tool_result[:256] + ("..." if len(tool_result) > 256 else "")}
+
+                span.set_status(trace.Status(trace.StatusCode.ERROR, "Max tool turns exceeded"))
+                raise RuntimeError("Grok exceeded the maximum number of tool turns (8)")
+            finally:
+                if conn:
+                    conn.close()
+    finally:
+        await effect_scope.stack.rollback()
 
 async def run_agent(context: ContextPacket, allowed_tools: list[str], agent_profile: AgentProfile | None = None) -> dict[str, Any]:
     async for event in run_agent_generator(None, context, allowed_tools, agent_profile):
@@ -529,7 +563,7 @@ async def _dispatch_tool(
             )
         except Exception as e:
             result = str(e)
-            
+
         return result, _action_record(
             policy_decision,
             result,
@@ -659,7 +693,7 @@ async def _dispatch_tool(
     result = _read_directory(arguments.get("path", "."))
     return result, _action_record(policy_decision, result)
 
-        
+
 def _dispatch_devops_read_tool(
     name: str,
     arguments: dict[str, Any],
@@ -726,7 +760,7 @@ def _read_directory(path: str) -> str:
     working_directory = Path.cwd().resolve()
     directory = (working_directory / path).resolve()
 
-    # Phase 13.1 Sandbox Policy: Deny sensitive directories globally
+    # Phase 13.3 Sandbox Policy: Deny sensitive directories globally
     deny_patterns = {".ssh", ".aws", ".kube", "secrets"}
     for part in directory.parts:
         if part in deny_patterns:
