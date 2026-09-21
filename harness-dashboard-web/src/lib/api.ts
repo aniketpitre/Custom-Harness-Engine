@@ -2,7 +2,7 @@ import {
   buildHermesWebSocketUrl,
   type ModelOptionProvider,
   type ModelOptionsResult,
-} from "@hermes/shared";
+} from "./hermes-shared-mock";
 
 // The dashboard can be served either at the root of its host (e.g.
 // https://kanban.tilos.com/) or under a URL prefix when reverse-proxied

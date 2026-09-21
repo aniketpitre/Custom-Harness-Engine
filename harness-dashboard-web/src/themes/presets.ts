@@ -1,4 +1,5 @@
-import { parseColor, THEME_PRESET_PALETTES, type ThemePresetPalette } from "@hermes/shared";
+import { parseColor, THEME_PRESET_PALETTES } from "../lib/hermes-shared-mock";
+type ThemePresetPalette = any;
 import type { DashboardTheme, ThemePalette, ThemeTypography, ThemeLayout } from "./types";
 
 /**

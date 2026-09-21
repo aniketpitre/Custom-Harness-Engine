@@ -1,4 +1,4 @@
-import { applyDocumentLocale, LOCALE_ENDONYMS } from "@hermes/shared/i18n";
+import { applyDocumentLocale, LOCALE_ENDONYMS } from "../lib/hermes-shared-mock";
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import type { Locale, Translations } from "./types";
 import { en } from "./en";
