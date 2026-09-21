@@ -71,7 +71,7 @@ def test_agent_registry_get_and_list():
     assert reg.get_agent("nonexistent") is None
     agents_list = reg.list_agents()
     assert len(agents_list) >= 2
-    ids = [a.id for a in agents_list]
+    ids = [a["id"] for a in agents_list]
     assert "devops_agent" in ids
     assert "read_only_explorer" in ids
 

@@ -26,6 +26,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks, APIRouter, Depends
 
 app = FastAPI(title="Harness Engine Control Plane API")
 dashboard_api = APIRouter(prefix="/api")
+registry = AgentRegistry()
 
 @dashboard_api.get("/runs")
 def get_runs():
