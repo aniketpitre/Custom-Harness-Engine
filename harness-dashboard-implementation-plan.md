@@ -8,9 +8,9 @@ This document outlines the phases for upgrading the Harness Engine Dashboard to 
 | :--- | :--- | :--- |
 | **D0-D11** | Backend API & Initial UI | ✅ DONE |
 | **D12** | Layout Refactor (Router, Layout Components) | ✅ DONE |
-| **D13** | Terminal Integration (XTerm.js) | IN PROGRESS |
-| **D14** | Fluid UI Motion (motion) | TODO |
-| **D15** | Command Palette (Interactions) | TODO |
+| **D13** | Terminal Integration (XTerm.js) | ✅ DONE |
+| **D14** | Fluid UI Motion (motion) | ✅ DONE |
+| **D15** | Command Palette (Interactions) | ✅ DONE |
 
 ---
 

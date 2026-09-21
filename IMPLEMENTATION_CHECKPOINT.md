@@ -10,4 +10,4 @@
 | D12 | Layout Refactor (Router, Layout) | ✅ DONE |
 | D13 | Terminal Integration (XTerm) | ✅ DONE |
 | D14 | Fluid UI Motion (motion) | ✅ DONE |
-| D15 | Command Palette | 🔵 IN PROGRESS |
+| D15 | Command Palette | ✅ DONE |
