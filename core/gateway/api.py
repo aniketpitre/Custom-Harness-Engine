@@ -24,6 +24,8 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks, APIRouter, Depends
 
 # ... (rest of imports)
 
+app = FastAPI(title="Harness Engine Control Plane API")
+
 from fastapi.responses import HTMLResponse
 
 @app.get("/")
@@ -39,8 +41,6 @@ def serve_dummy_html():
         </body>
     </html>
     """)
-
-app = FastAPI(title="Harness Engine Control Plane API")
 dashboard_api = APIRouter(prefix="/api")
 registry = AgentRegistry()
 
