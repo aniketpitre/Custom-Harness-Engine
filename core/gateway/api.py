@@ -24,6 +24,22 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks, APIRouter, Depends
 
 # ... (rest of imports)
 
+from fastapi.responses import HTMLResponse
+
+@app.get("/")
+def serve_dummy_html():
+    return HTMLResponse("""
+    <html>
+        <body>
+            <script>
+                window.__HERMES_SESSION_TOKEN__ = "dev-token-local";
+                window.__HERMES_DASHBOARD_EMBEDDED_CHAT__ = true;
+                window.__HERMES_INITIAL_PROFILE__ = "{}";
+            </script>
+        </body>
+    </html>
+    """)
+
 app = FastAPI(title="Harness Engine Control Plane API")
 dashboard_api = APIRouter(prefix="/api")
 registry = AgentRegistry()
