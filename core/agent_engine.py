@@ -415,15 +415,12 @@ async def run_agent_generator(session_id: str | None, context: ContextPacket, al
                     },
                     {"role": "user", "content": _build_prompt(context)},
                 ]
-            tools = [READ_DIRECTORY_TOOL] if "Read" in allowed_tools else []
-            if "DevOpsRead" in allowed_tools:
-                tools.extend(DEVOPS_READ_TOOLS)
-            if "DevOpsWrite" in allowed_tools:
-                tools.extend(DEVOPS_ACTION_TOOLS)
-            if "Generic" in allowed_tools:
-                tools.extend(GENERIC_TOOLS)
-            if "Advisor" in allowed_tools:
-                tools.extend(ADVISOR_TOOLS)
+            tools = [LOAD_SKILL_TOOL]
+            loaded_skills = set()
+            available_categories = [cat for cat in ["Read", "DevOpsRead", "DevOpsWrite", "Generic", "Advisor"] if cat in allowed_tools]
+            if not initial_history:
+                messages[0]["content"] += f"\n\n[JIT Context] Your allowed skill categories are: {available_categories}. You currently have no domain tools loaded. Use the `load_skill` tool to dynamically load tools for these categories when you need them. Example: load_skill('DevOpsWrite')."
+
             events: list[Any] = []
             actions: list[ActionRecord] = []
 
@@ -500,6 +497,31 @@ async def run_agent_generator(session_id: str | None, context: ContextPacket, al
                     for tool_call in tool_calls:
                         yield {"type": "tool_call", "name": tool_call.function.name, "arguments": json.loads(tool_call.function.arguments or "{}")}
                         arguments = json.loads(tool_call.function.arguments or "{}")
+                        if tool_call.function.name == "load_skill":
+                            skill_name = arguments.get("skill_name")
+                            if skill_name in allowed_tools and skill_name not in loaded_skills:
+                                loaded_skills.add(skill_name)
+                                if skill_name == "Read": tools.append(READ_DIRECTORY_TOOL)
+                                elif skill_name == "DevOpsRead": tools.extend(DEVOPS_READ_TOOLS)
+                                elif skill_name == "DevOpsWrite": tools.extend(DEVOPS_ACTION_TOOLS)
+                                elif skill_name == "Generic": tools.extend(GENERIC_TOOLS)
+                                elif skill_name == "Advisor": tools.extend(ADVISOR_TOOLS)
+                                tool_result = f"Successfully loaded {skill_name} tools into context."
+                            elif skill_name in loaded_skills:
+                                tool_result = f"Skill {skill_name} is already loaded."
+                            else:
+                                tool_result = f"Skill {skill_name} is not available or not allowed. Allowed: {allowed_tools}"
+                            
+                            # Append the tool result without dispatching
+                            messages.append(
+                                {
+                                    "role": "tool",
+                                    "tool_call_id": tool_call.id,
+                                    "content": tool_result,
+                                }
+                            )
+                            yield {"type": "tool_result", "name": tool_call.function.name, "result_summary": tool_result}
+                            continue
                         tool_result, action = await _dispatch_tool(
                             tool_call.id,
                             tool_call.function.name,
@@ -524,6 +546,25 @@ async def run_agent_generator(session_id: str | None, context: ContextPacket, al
                     conn.close()
     finally:
         await effect_scope.stack.rollback()
+
+LOAD_SKILL_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "load_skill",
+        "description": "Load a specific domain skill into your context allowing you to use its tools. Call this when you need tools for a specific domain.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "skill_name": {
+                    "type": "string",
+                    "description": "The name of the skill category to load (e.g., 'DevOpsRead', 'DevOpsWrite', 'Generic', 'Advisor')"
+                }
+            },
+            "required": ["skill_name"],
+            "additionalProperties": False
+        }
+    }
+}
 
 async def run_agent(context: ContextPacket, allowed_tools: list[str], agent_profile: AgentProfile | None = None, initial_history: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     async for event in run_agent_generator(None, context, allowed_tools, agent_profile, initial_history):
