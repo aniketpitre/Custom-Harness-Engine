@@ -8,7 +8,7 @@ Harness Engine is a general-purpose, agentic execution and learning runtime engi
 - **Verifiable Execution Loop**: Every operation produces a immutable `RunReceipt`. Verification gates explicitly validate outcomes against expected state (e.g., K8s pod liveness, configuration targets) *before* marking a goal complete, eliminating hallucinated success.
 - **Robust Iterative Learning**: Successful verification outcomes automatically promote candidate tools/workflows to validated "Skills" (`SKILL.md` format), building an persistent organic toolset in real-time.
 - **Production-Grade Hardening**: Built for high-stakes environments with built-in token budgeting, automated output-log spilling (`.workspace/spill/`), anomaly rollback mechanisms, and automated memory consolidation ("Dreams").
-- **Hermes-Style Observability**: Integrated real-time dashboard provides terminal-native visibility into the live agent pipeline, featuring SSE event streaming, budget gauges, and adversarial cross-check status (Phase 0–24 implementation).
+- **SSE Event Streaming**: Real-time visibility into the live agent pipeline via `/sessions/{id}/stream`, with mid-task steering via `/sessions/{id}/interrupt`.
 
 ## Core Architecture
 
@@ -22,26 +22,38 @@ GOAL → CONTEXT → AGENT → POLICY → APPROVAL → EXECUTE → VERIFY → RE
 *   **Safety**: Built-in Risk Tiering prevents unauthorized actions.
 *   **Verifiable Execution**: `RunReceipts` ensure outcomes match goals.
 *   **Iterative Learning**: Automated skill promotion loop.
-*   **Observability**: Real-time integration via SSE event streaming.
+*   **Observability**: Real-time SSE event streaming and interruption support.
 
-## Implementation Status (Phases 0–24)
+## Implementation Status
 
 ### Phases 0–17: Core Runtime & Infrastructure
 Completed core primitives, agent loop, DevOps packs, observability, interactive webhooks, and background infrastructure (scheduler, advisor, dreamer).
 
-### Phases 18–24: Dashboard Implementation
-Complete Hermes-style dashboard featuring:
-- **Terminal-Native Layout**: Dark, dense, high-velocity stream visualization.
-- **Real-time Steering**: Interactive interruption and session steering.
-- **Advanced Observability**: Security/Budget gauges, Memory Dream visualizer, and Verification inspector.
+### Phases 18–20: Composability & HMR
+- **Phase 18**: Effect Ownership — `EffectStack`/`EffectScope` for temporal composability.
+- **Phase 19**: Lifecycle Management — `LifecycleState` enum for agent registry states.
+- **Phase 20**: Hot Module Reload — transactional `reload_registry()` without process restart.
 
-*See `IMPLEMENTATION_CHECKPOINT.md` for status.*
+*See `IMPLEMENTATION_CHECKPOINT.md` and `IMPLEMENTATION_CHECKPOINT_V2.md` for status.*
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/agents` | List registered agents with lifecycle states |
+| GET | `/agents/{id}` | Get agent profile |
+| POST | `/sessions` | Create a new execution session |
+| GET | `/sessions/{id}` | Get session status and receipt |
+| GET | `/sessions/{id}/stream` | SSE stream of agent execution events |
+| POST | `/sessions/{id}/interrupt` | Inject mid-task steering message |
+| POST | `/cron` | Schedule recurring agent execution |
+| POST | `/memory/dream` | Trigger memory consolidation |
 
 ## Getting Started
 
 ### Prerequisites
 - Python 3.12+
-- Docker & Docker Compose
+- Docker & Docker Compose (optional, for Vault)
 - HashiCorp Vault (accessible, with tokens)
 
 ### Setup
@@ -56,14 +68,11 @@ Complete Hermes-style dashboard featuring:
 3. **Vault**: Ensure Vault is seeded with Groq/Telegram/Kubernetes secrets.
 
 ### Running
-- **API**: `uvicorn core.gateway.api:app --reload`
-- **Dashboard (Frontend)**:
-  ```bash
-  cd frontend
-  npm install
-  npm run dev
-  ```
-  *(Then visit `http://localhost:5173`)*
+```bash
+python main.py
+# or
+uvicorn core.gateway.api:app --host 0.0.0.0 --port 8000
+```
 
 ---
 *For technical details, see `general_purpose_agent_harness_architecture.md`.*

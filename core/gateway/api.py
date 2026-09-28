@@ -1,10 +1,9 @@
 from core.gateway.webhooks import dispatch_webhook
 import asyncio
-import asyncio
 import uuid
 import json
 from datetime import datetime, timezone
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
@@ -19,50 +18,9 @@ from core.primitives.execution import RunReceipt
 from core.memory.store import search_memory
 from core.primitives.learning import draft_skill_if_warranted
 
-
-from fastapi import FastAPI, HTTPException, BackgroundTasks, APIRouter, Depends
-
-# ... (rest of imports)
-
 app = FastAPI(title="Harness Engine Control Plane API")
 
-from fastapi.responses import HTMLResponse
-
-@app.get("/")
-def serve_dummy_html():
-    return HTMLResponse("""
-    <html>
-        <body>
-            <script>
-                window.__HERMES_SESSION_TOKEN__ = "dev-token-local";
-                window.__HERMES_DASHBOARD_EMBEDDED_CHAT__ = true;
-                window.__HERMES_INITIAL_PROFILE__ = "{}";
-            </script>
-        </body>
-    </html>
-    """)
-dashboard_api = APIRouter(prefix="/api")
 registry = AgentRegistry()
-
-@dashboard_api.get("/runs")
-def get_runs():
-    conn = init_db()
-    try:
-        rows = conn.execute("SELECT * FROM sessions ORDER BY created_at DESC LIMIT 50").fetchall()
-        return [dict(row) for row in rows]
-    finally:
-        conn.close()
-
-@dashboard_api.get("/approvals")
-def get_approvals():
-    conn = init_db()
-    try:
-        rows = conn.execute("SELECT * FROM approval_queue WHERE status = 'pending'").fetchall()
-        return [dict(row) for row in rows]
-    finally:
-        conn.close()
-
-app.include_router(dashboard_api)
 
 
 
