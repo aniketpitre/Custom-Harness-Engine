@@ -7,4 +7,5 @@
 - [x] Phase 21: Auto-Compaction Context Engine
 - [x] Phase 22: Session Branching (The "Fork" Primitive)
 - [x] Phase 23: On-Demand Skill & Tool Loading (JIT Context)
-- [ ] Phase 24: Self-Editing Harness (Live Hot-Swapping)
+- [x] Phase 24: Self-Editing Harness (Live Hot-Swapping)
+- [x] Phase 25: Setup Wizard & User Guide
