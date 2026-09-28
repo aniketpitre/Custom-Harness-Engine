@@ -395,7 +395,7 @@ async def _compact_history(messages: list[dict[str, Any]], model_name: str, api_
         print(f"Compaction failed: {e}")
         return messages
 
-async def run_agent_generator(session_id: str | None, context: ContextPacket, allowed_tools: list[str], agent_profile: AgentProfile | None = None) -> AsyncGenerator[dict[str, Any], None]:
+async def run_agent_generator(session_id: str | None, context: ContextPacket, allowed_tools: list[str], agent_profile: AgentProfile | None = None, initial_history: list[dict[str, Any]] | None = None) -> AsyncGenerator[dict[str, Any], None]:
     effect_scope = EffectScope()
     try:
         with tracer.start_as_current_span("harness_agent_run") as span:
@@ -405,13 +405,16 @@ async def run_agent_generator(session_id: str | None, context: ContextPacket, al
             model = (agent_profile.model if agent_profile and agent_profile.model else None) or os.getenv("HARNESS_MODEL") or os.getenv("GROK_MODEL") or "groq/openai/gpt-oss-120b"
             api_key = get_secret("groq", "api_key")
             sys_prompt = agent_profile.system_prompt if agent_profile else "You are an execution agent. Use available tools when they provide direct evidence for the goal."
-            messages: list[dict[str, Any]] = [
-                {
-                    "role": "system",
-                    "content": sys_prompt,
-                },
-                {"role": "user", "content": _build_prompt(context)},
-            ]
+            if initial_history:
+                messages = list(initial_history)
+            else:
+                messages: list[dict[str, Any]] = [
+                    {
+                        "role": "system",
+                        "content": sys_prompt,
+                    },
+                    {"role": "user", "content": _build_prompt(context)},
+                ]
             tools = [READ_DIRECTORY_TOOL] if "Read" in allowed_tools else []
             if "DevOpsRead" in allowed_tools:
                 tools.extend(DEVOPS_READ_TOOLS)
@@ -466,6 +469,7 @@ async def run_agent_generator(session_id: str | None, context: ContextPacket, al
                                 "events": events.copy(),
                                 "final_text": "Execution blocked: Token budget exceeded",
                                 "model_used": model,
+                                "message_history": messages,
                                 "actions": actions,
                                 "verification": None,
                             }
@@ -482,6 +486,7 @@ async def run_agent_generator(session_id: str | None, context: ContextPacket, al
                                 "events": events.copy(),
                                 "final_text": getattr(message, "content", None) or "",
                                 "model_used": model,
+                                "message_history": messages,
                                 "actions": actions,
                                 "verification": _run_requested_verification(context),
                             }
@@ -520,8 +525,8 @@ async def run_agent_generator(session_id: str | None, context: ContextPacket, al
     finally:
         await effect_scope.stack.rollback()
 
-async def run_agent(context: ContextPacket, allowed_tools: list[str], agent_profile: AgentProfile | None = None) -> dict[str, Any]:
-    async for event in run_agent_generator(None, context, allowed_tools, agent_profile):
+async def run_agent(context: ContextPacket, allowed_tools: list[str], agent_profile: AgentProfile | None = None, initial_history: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    async for event in run_agent_generator(None, context, allowed_tools, agent_profile, initial_history):
         if event["type"] == "final_receipt":
             return event["receipt"]
     raise RuntimeError("Agent terminated without producing a final receipt")

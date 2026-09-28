@@ -66,6 +66,7 @@ def init_db(db_path: str | Path = DB_PATH) -> sqlite3.Connection:
             environment JSON,
             run_receipt JSON,
             interruption_payload TEXT,
+            parent_session_id TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
@@ -91,8 +92,14 @@ def init_db(db_path: str | Path = DB_PATH) -> sqlite3.Connection:
         );
         """
     )
+
+    try:
+        conn.execute("ALTER TABLE sessions ADD COLUMN parent_session_id TEXT")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     return conn
+
 
 
 def add_memory(
@@ -198,14 +205,14 @@ def save_workflow_checkpoint(conn: sqlite3.Connection, workflow_id: str, phase_i
     conn.commit()
 
 
-def create_session(conn: sqlite3.Connection, session_id: str, agent_id: str, goal: str, environment: dict = None) -> None:
+def create_session(conn: sqlite3.Connection, session_id: str, agent_id: str, goal: str, environment: dict = None, parent_session_id: str = None) -> None:
     now = datetime.now(timezone.utc).isoformat()
     conn.execute(
         '''
-        INSERT INTO sessions (id, agent_id, goal, status, environment, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO sessions (id, agent_id, goal, status, environment, parent_session_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''',
-        (session_id, agent_id, goal, "pending", json.dumps(environment or {}), now, now)
+        (session_id, agent_id, goal, "pending", json.dumps(environment or {}), parent_session_id, now, now)
     )
     conn.commit()
 
@@ -219,6 +226,7 @@ def get_session(conn: sqlite3.Connection, session_id: str) -> dict | None:
             "status": row["status"],
             "environment": json.loads(row["environment"]) if row["environment"] else {},
             "run_receipt": json.loads(row["run_receipt"]) if row["run_receipt"] else None,
+            "parent_session_id": row["parent_session_id"] if "parent_session_id" in row.keys() else None,
             "created_at": row["created_at"],
             "updated_at": row["updated_at"]
         }

@@ -84,7 +84,9 @@ async def execute_session(session_id: str, agent_id: str, goal_text: str):
             update_session(conn, session_id, "failure")
             return
 
-        result = await run_agent(context, allowed_tools=agent_profile.allowed_tools, agent_profile=agent_profile)
+        session = get_session(conn, session_id)
+        initial_history = session.get("run_receipt", {}).get("message_history") if session and session.get("run_receipt") else None
+        result = await run_agent(context, allowed_tools=agent_profile.allowed_tools, agent_profile=agent_profile, initial_history=initial_history)
         verification = result.get("verification")
 
         # Build RunReceipt
@@ -183,6 +185,40 @@ def interrupt_session(session_id: str, req: InterruptRequest):
         conn.close()
     return {"status": "interruption_queued"}
 
+class ForkSessionRequest(BaseModel):
+    goal_override: str | None = None
+    
+@app.post("/sessions/{session_id}/fork", status_code=201)
+def fork_session(session_id: str, req: ForkSessionRequest):
+    conn = init_db()
+    try:
+        session = get_session(conn, session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+            
+        new_session_id = str(uuid.uuid4())
+        new_goal = req.goal_override if req.goal_override else session["goal"]
+        
+        # Pull existing receipt properly 
+        run_receipt = session.get("run_receipt")
+        
+        create_session(
+            conn,
+            new_session_id,
+            session["agent_id"],
+            new_goal,
+            session["environment"],
+            parent_session_id=session_id
+        )
+        
+        if run_receipt:
+            update_session(conn, new_session_id, "pending", run_receipt)
+            
+    finally:
+        conn.close()
+        
+    return {"session_id": new_session_id, "status": "pending"}
+
 @app.get("/sessions/{session_id}/stream")
 async def stream_session(session_id: str):
     conn = init_db()
@@ -205,12 +241,17 @@ async def stream_session(session_id: str):
         conn.close()
 
     async def sse_generator():
+        initial_history = None
+        if session.get("run_receipt") and isinstance(session["run_receipt"], dict):
+            initial_history = session["run_receipt"].get("message_history")
+
         try:
             async for event in run_agent_generator(
                 session_id=session_id,
                 context=context,
                 allowed_tools=agent_profile.allowed_tools,
-                agent_profile=agent_profile
+                agent_profile=agent_profile,
+                initial_history=initial_history
             ):
                 if event["type"] == "final_receipt":
                     # Update DB
