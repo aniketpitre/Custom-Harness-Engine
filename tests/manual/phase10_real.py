@@ -11,7 +11,7 @@ from core.gateway.telegram import _approvers
 # Hardcode the approval to simulate a human clicking 'Approve' on Telegram
 # Since we are bypassing the interactive Telegram prompt for automation
 os.environ["VAULT_ADDR"] = "http://127.0.0.1:8200"
-os.environ["VAULT_TOKEN"] = "c6869775842d732f69f590ac45ec422847ca27ffa15a9bf9b45719437a6803f4"
+os.environ["VAULT_TOKEN"] = "dummy_test_token"
 
 async def test_live_pr():
     print("Initializing Real Production GitOps Test...")

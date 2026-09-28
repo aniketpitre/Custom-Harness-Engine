@@ -10,7 +10,7 @@ sys.path.insert(0, '/workspaces/Custom-Harness-Engine')
 
 # Set up Vault environment for the test
 os.environ["VAULT_ADDR"] = "http://127.0.0.1:8200"
-os.environ["VAULT_TOKEN"] = "c6869775842d732f69f590ac45ec422847ca27ffa15a9bf9b45719437a6803f4"
+os.environ["VAULT_TOKEN"] = "dummy_test_token"
 os.environ["VAULT_MOUNT_POINT"] = "harness-secrets"
 
 # Set up OpenTelemetry endpoint (using localhost for testing)
