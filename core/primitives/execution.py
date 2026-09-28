@@ -33,7 +33,7 @@ class RunReceipt(BaseModel):
     actions: list[ActionRecord] = Field(default_factory=list)
     verification: VerificationResult | None = None
     candidate_skill: CandidateSkill | None = None
-    final_text: str
+    final_text: str = ""
     message_history: list[dict[str, object]] | None = None
     status: str = Field(pattern="^(running|success|failure|blocked)$", default="running")
     started_at: datetime

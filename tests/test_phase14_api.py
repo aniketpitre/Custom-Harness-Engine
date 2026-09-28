@@ -178,7 +178,7 @@ def test_api_full_session_lifecycle(override_agents, temp_db, monkeypatch):
     """End-to-end: create session via API, background task executes (mocked LLM),
     then retrieve session and verify the receipt was persisted in SQLite."""
 
-    async def mock_run_agent(context, allowed_tools, agent_profile=None):
+    async def mock_run_agent(context, allowed_tools, agent_profile=None, initial_history=None):
         return {
             "model_used": "mock-model",
             "actions": [],

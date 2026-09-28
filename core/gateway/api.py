@@ -114,6 +114,8 @@ async def execute_session(session_id: str, agent_id: str, goal_text: str):
         )
         asyncio.create_task(dispatch_webhook(session_id, receipt.status, receipt_dict))
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         update_session(conn, session_id, "failure")
         asyncio.create_task(dispatch_webhook(session_id, "failure"))
     finally:
