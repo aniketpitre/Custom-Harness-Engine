@@ -20,6 +20,15 @@ def get_vault_client() -> hvac.Client:
 
 def get_secret(path: str, key: str) -> str:
     mount_point = os.environ.get("VAULT_MOUNT_POINT", DEFAULT_VAULT_MOUNT_POINT)
+    
+    # Transparently check 'llm' path for 'groq' api key request
+    if path == "groq" and key == "api_key":
+        try:
+            resp = get_vault_client().secrets.kv.v2.read_secret_version(path="llm", mount_point=mount_point)
+            return resp["data"]["data"][key]
+        except Exception:
+            pass
+
     response = get_vault_client().secrets.kv.v2.read_secret_version(
         path=path,
         mount_point=mount_point,
