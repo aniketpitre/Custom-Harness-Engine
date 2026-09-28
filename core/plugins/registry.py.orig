@@ -1,0 +1,45 @@
+import ast
+import importlib
+import sys
+from pathlib import Path
+from typing import Any, Callable, Dict
+
+DYNAMIC_PLUGINS_DIR = Path(__file__).parent / "dynamic"
+DYNAMIC_PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
+
+dynamic_tool_schemas: list[Dict[str, Any]] = []
+dynamic_tool_callables: Dict[str, Callable] = {}
+
+def load_dynamic_tools():
+    """Scan and load tools from core/plugins/dynamic/."""
+    global dynamic_tool_schemas, dynamic_tool_callables
+    
+    # Simple reload mechanism: simply clear and reload.
+    # In a full production system, we'd want more sophisticated module hot-reloading.
+    dynamic_tool_schemas.clear()
+    dynamic_tool_callables.clear()
+    
+    for filepath in DYNAMIC_PLUGINS_DIR.glob("*.py"):
+        if filepath.name == "__init__.py":
+            continue
+            
+        module_name = f"core.plugins.dynamic.{filepath.stem}"
+        if module_name in sys.modules:
+            module = importlib.reload(sys.modules[module_name])
+        else:
+            module = importlib.import_module(module_name)
+            
+        if hasattr(module, "TOOL_SCHEMA") and hasattr(module, "execute"):
+            schema = getattr(module, "TOOL_SCHEMA")
+            callable_fn = getattr(module, "execute")
+            
+            if "function" not in schema:
+                schema = {"type": "function", "function": schema}
+            dynamic_tool_schemas.append(schema)
+            dynamic_tool_callables[schema["function"]["name"]] = callable_fn
+
+def register_new_tool(name: str, code: str) -> None:
+    """Write physical python file to the dynamic directory and reload."""
+    filepath = DYNAMIC_PLUGINS_DIR / f"{name}.py"
+    filepath.write_text(code)
+    load_dynamic_tools()
