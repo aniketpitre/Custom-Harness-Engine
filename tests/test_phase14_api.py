@@ -36,7 +36,7 @@ def override_agents():
 def auth_header(monkeypatch):
     monkeypatch.setenv("HARNESS_API_TOKEN", "test-token")
 
-client = TestClient(app)
+client = TestClient(app, headers={"Authorization": "Bearer test-token"})
 
 @pytest.fixture(autouse=True)
 def _override_auth(monkeypatch):
@@ -64,7 +64,7 @@ def temp_db(tmp_path, monkeypatch):
     return db_path
 
 
-client = TestClient(app)
+client = TestClient(app, headers={"Authorization": "Bearer test-token"})
 
 
 # ---------------------------------------------------------------------------
