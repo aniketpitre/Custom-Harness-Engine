@@ -366,6 +366,35 @@ def _spill_if_needed(result: str, session_id: str | None, tag: str) -> str:
     preview = result[:MAX_LEN // 2]
     return f"{preview}\n\n...[TRUNCATED. Full output saved to {filepath}]"
 
+async def _compact_history(messages: list[dict[str, Any]], model_name: str, api_key: str | None) -> list[dict[str, Any]]:
+    """Phase 21: Auto-Compaction Context Engine. Compress history to save context window."""
+    if len(messages) <= 6:
+        return messages
+    system_msg = messages[0]
+    tail_msgs = messages[-3:]
+    to_compact = messages[1:-3]
+
+    prompt = "Summarize the following conversation history densely to preserve all facts, tool calls, and decisions:\n\n"
+    for m in to_compact:
+        content = m.get("content", "")
+        # avoid massive tool returns breaking the summarizer
+        if content and len(content) > 5000:
+            content = content[:5000] + "...[TRUNCATED]"
+        prompt += f"{m.get('role', 'unknown')}: {content}\n"
+
+    try:
+        response = await litellm.acompletion(
+            model=os.environ.get("HARNESS_COMPACT_MODEL") or model_name,
+            api_key=api_key,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        summary = response.choices[0].message.content
+        compacted_msg = {"role": "system", "content": f"Prior conversation summary:\n{summary}"}
+        return [system_msg, compacted_msg] + tail_msgs
+    except Exception as e:
+        print(f"Compaction failed: {e}")
+        return messages
+
 async def run_agent_generator(session_id: str | None, context: ContextPacket, allowed_tools: list[str], agent_profile: AgentProfile | None = None) -> AsyncGenerator[dict[str, Any], None]:
     effect_scope = EffectScope()
     try:
@@ -422,6 +451,12 @@ async def run_agent_generator(session_id: str | None, context: ContextPacket, al
                     # Phase 16.2 Token tracking
                     if hasattr(response, "usage") and response.usage:
                         total_tokens += getattr(response.usage, "total_tokens", 0)
+
+                    # Phase 21: Auto-Compaction Context Engine
+                    # Triggers if the conversation tree extends past 10 messages to keep the window lightning-fast
+                    if len(messages) >= 12:
+                        yield {"type": "message", "content": "Running background history compaction to optimize context window..."}
+                        messages = await _compact_history(messages, model, api_key)
 
                     if total_tokens >= token_budget:
                         yield {"type": "message", "content": "Token budget exceeded."}
