@@ -415,7 +415,10 @@ async def run_agent_generator(session_id: str | None, context: ContextPacket, al
                     },
                     {"role": "user", "content": _build_prompt(context)},
                 ]
-            tools = [LOAD_SKILL_TOOL]
+            from core.plugins.registry import load_dynamic_tools, dynamic_tool_schemas
+            load_dynamic_tools()
+            tools = [LOAD_SKILL_TOOL, WRITE_AND_REGISTER_TOOL]
+            tools.extend(dynamic_tool_schemas)
             loaded_skills = set()
             available_categories = [cat for cat in ["Read", "DevOpsRead", "DevOpsWrite", "Generic", "Advisor"] if cat in allowed_tools]
             if not initial_history:
@@ -547,6 +550,29 @@ async def run_agent_generator(session_id: str | None, context: ContextPacket, al
     finally:
         await effect_scope.stack.rollback()
 
+
+WRITE_AND_REGISTER_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "write_and_register_tool",
+        "description": "RISK TIER 3: Write a Python tool dynamically and hot-swap it into the Harness Engine. The new tool is available on the next turn. Requires human approval. Provide the schema definition and the execute(args: dict) -> str function body as python code.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "tool_name": {
+                    "type": "string"
+                },
+                "python_code": {
+                    "type": "string",
+                    "description": "Valid Python code defining `TOOL_SCHEMA: dict` and `async def execute(arguments: dict) -> str:`"
+                }
+            },
+            "required": ["tool_name", "python_code"],
+            "additionalProperties": False
+        }
+    }
+}
+
 LOAD_SKILL_TOOL = {
     "type": "function",
     "function": {
@@ -606,6 +632,42 @@ async def _dispatch_tool(
     allowed_tools: list[str],
     session_id: str | None = None,
 ) -> tuple[str, ActionRecord]:
+
+    if name == "write_and_register_tool":
+        from core.primitives.policy import PolicyDecision, RiskTier
+        policy_decision = PolicyDecision(tool="harness", action="write_and_register_tool", decision="REQUIRE_APPROVAL", risk_tier=RiskTier.R3, reason="Self-modification requires explicit human approval")
+        approved = await request_approval(
+            action_id=action_id,
+            description=f"Self Modify: Write Tool '{arguments.get('tool_name')}'",
+            risk_tier=policy_decision.risk_tier,
+        )
+        if not approved:
+            raise PermissionError("Human approval denied tool self-modification")
+        policy_decision = PolicyDecision.model_validate(
+            policy_decision.model_copy(
+                update={"decision": "ALLOW", "approved_by": get_approver(action_id)}
+            )
+        )
+        from core.plugins.registry import register_new_tool
+        register_new_tool(arguments["tool_name"], arguments["python_code"])
+        result = f"Successfully registered new dynamic tool '{arguments['tool_name']}'."
+        return result, ActionRecord(tool="harness", action="write_and_register_tool", policy_decision=policy_decision, started_at=datetime.now(timezone.utc), finished_at=datetime.now(timezone.utc), raw_result=result, approved_by=policy_decision.approved_by)
+
+    from core.plugins.registry import dynamic_tool_callables
+    if name in dynamic_tool_callables:
+        from core.primitives.policy import PolicyDecision, RiskTier
+        policy_decision = PolicyDecision(tool="dynamic", action=name, decision="ALLOW", risk_tier=RiskTier.R0, reason="Dynamic tool execution")
+        fn = dynamic_tool_callables[name]
+        try:
+            if asyncio.iscoroutinefunction(fn):
+                result = await fn(arguments)
+            else:
+                result = fn(arguments)
+        except Exception as e:
+            result = f"Error executing dynamic tool: {e}"
+            
+        return str(result), ActionRecord(tool="dynamic", action=name, policy_decision=policy_decision, started_at=datetime.now(timezone.utc), finished_at=datetime.now(timezone.utc), raw_result=str(result))
+
     if name in {"kubectl_get_pods", "kubectl_describe_pod", "kubectl_logs", "argocd_app_list", "argocd_app_get"}:
         if "DevOpsRead" not in allowed_tools:
             raise PermissionError(f"Tool is not allowed: {name}")
