@@ -3,6 +3,7 @@ import sqlite3
 import json
 from pathlib import Path
 from fastapi.testclient import TestClient
+import os
 
 from core.registry import AgentRegistry, load_agents
 from core.primitives.agent import AgentProfile, Session
@@ -30,6 +31,23 @@ def override_agents():
     registry._agents = test_agents
     yield
     registry._agents = original_agents
+
+@pytest.fixture(autouse=True)
+def auth_header(monkeypatch):
+    monkeypatch.setenv("HARNESS_API_TOKEN", "test-token")
+
+client = TestClient(app)
+
+@pytest.fixture(autouse=True)
+def _override_auth(monkeypatch):
+    monkeypatch.setenv("HARNESS_API_TOKEN", "test-token")
+    monkeypatch.setattr("core.gateway.api.get_secret", lambda path, key: "test-token")
+
+
+@pytest.fixture(autouse=True)
+def patch_get_secret(monkeypatch):
+    monkeypatch.setattr("core.gateway.api.get_secret", lambda path, key: "test-token" if key == "api_token" else "mock")
+
 
 
 @pytest.fixture

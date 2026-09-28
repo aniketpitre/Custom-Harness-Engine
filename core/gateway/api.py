@@ -5,9 +5,11 @@ import json
 from datetime import datetime, timezone
 from typing import Dict, Any
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.responses import StreamingResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
+import os
 
 from core.registry import AgentRegistry
 from core.memory.store import init_db, create_session, get_session, update_session, set_session_interruption
@@ -17,8 +19,24 @@ from core.primitives.context import ContextPacket
 from core.primitives.execution import RunReceipt
 from core.memory.store import search_memory
 from core.primitives.learning import draft_skill_if_warranted
+from core.secrets import get_secret
 
 app = FastAPI(title="Harness Engine Control Plane API")
+
+security = HTTPBearer()
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    expected_token = os.environ.get("HARNESS_API_TOKEN")
+    if not expected_token:
+        # Fallback to checking Vault for a token if not in environment
+        try:
+            expected_token = get_secret("harness", "api_token")
+        except Exception:
+            expected_token = "default_unsafe_token_change_me"
+
+    if credentials.credentials != expected_token:
+        raise HTTPException(status_code=401, detail="Invalid API token")
+    return credentials.credentials
 
 registry = AgentRegistry()
 
@@ -36,7 +54,7 @@ from core.background.scheduler import start_scheduler, add_agent_cron_job
 def startup_event():
     start_scheduler()
 
-@app.post("/cron", status_code=201)
+@app.post("/cron", status_code=201, dependencies=[Depends(verify_token)])
 def create_cron(req: CreateCronRequest):
     agent = registry.get_agent(req.agent_id)
     if not agent:
@@ -122,12 +140,12 @@ async def execute_session(session_id: str, agent_id: str, goal_text: str):
         conn.close()
 
 
-@app.get("/agents")
+@app.get("/agents", dependencies=[Depends(verify_token)])
 def list_agents():
     return registry.list_agents()
 
 
-@app.get("/agents/{agent_id}")
+@app.get("/agents/{agent_id}", dependencies=[Depends(verify_token)])
 def get_agent(agent_id: str):
     agent = registry.get_agent(agent_id)
     if not agent:
@@ -135,7 +153,7 @@ def get_agent(agent_id: str):
     return agent
 
 
-@app.post("/sessions", status_code=201)
+@app.post("/sessions", status_code=201, dependencies=[Depends(verify_token)])
 def start_session(req: CreateSessionRequest, background_tasks: BackgroundTasks):
     agent = registry.get_agent(req.agent_id)
     if not agent:
@@ -159,7 +177,7 @@ def start_session(req: CreateSessionRequest, background_tasks: BackgroundTasks):
     return {"session_id": session_id, "status": "pending"}
 
 
-@app.get("/sessions/{session_id}")
+@app.get("/sessions/{session_id}", dependencies=[Depends(verify_token)])
 def retrieve_session(session_id: str):
     conn = init_db()
     try:
@@ -175,7 +193,7 @@ def retrieve_session(session_id: str):
 class InterruptRequest(BaseModel):
     message: str
 
-@app.post("/sessions/{session_id}/interrupt")
+@app.post("/sessions/{session_id}/interrupt", dependencies=[Depends(verify_token)])
 def interrupt_session(session_id: str, req: InterruptRequest):
     conn = init_db()
     try:
@@ -190,7 +208,7 @@ def interrupt_session(session_id: str, req: InterruptRequest):
 class ForkSessionRequest(BaseModel):
     goal_override: str | None = None
     
-@app.post("/sessions/{session_id}/fork", status_code=201)
+@app.post("/sessions/{session_id}/fork", status_code=201, dependencies=[Depends(verify_token)])
 def fork_session(session_id: str, req: ForkSessionRequest):
     conn = init_db()
     try:
@@ -221,7 +239,7 @@ def fork_session(session_id: str, req: ForkSessionRequest):
         
     return {"session_id": new_session_id, "status": "pending"}
 
-@app.get("/sessions/{session_id}/stream")
+@app.get("/sessions/{session_id}/stream", dependencies=[Depends(verify_token)])
 async def stream_session(session_id: str):
     conn = init_db()
     try:
@@ -311,7 +329,7 @@ async def stream_session(session_id: str):
 
 from core.memory.dreamer import run_memory_consolidation
 
-@app.post("/memory/dream")
+@app.post("/memory/dream", dependencies=[Depends(verify_token)])
 async def trigger_memory_dream():
     themes = await run_memory_consolidation()
     return {"status": "success", "consolidated_themes": themes or []}
