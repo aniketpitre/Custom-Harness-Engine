@@ -529,6 +529,14 @@ tests, and a cold-import test proving heavy optional packages are not imported a
 
 ---
 
+## Releasing
+
+`git tag v0.2.1 && git push origin v0.2.1` runs `.github/workflows/release.yml`: it checks the tag equals
+`core/__version__.py`, runs lint and tests, builds the wheel and sdist (`twine check`), publishes to PyPI with
+trusted publishing (no token stored), pushes a multi-arch (amd64 + arm64) image to
+`ghcr.io/aniketpitre/custom-harness-engine`, and creates a GitHub release. One-time setup on your side: create a
+`pypi` environment in the repo settings and add the project as a trusted publisher on pypi.org.
+
 ## Project layout
 
 ```text

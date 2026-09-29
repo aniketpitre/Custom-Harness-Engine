@@ -71,4 +71,5 @@ C7 persistent cron, heartbeat, list/pause/delete - done. C8 `AGENTS.md` - done.
 - No cost accounting (tokens only) and no multi-channel chat gateway.
 - Docker and the live tests could not be exercised in the build environment; compose/Dockerfile are validated statically.
 
-| Approvals with no setup: terminal prompt in `harness serve`/`run`, chained with API and Telegram (first answer wins) | Done: `core/gateway/channels.py`, `tests/test_terminal_approvals.py` |
+- Approvals with no setup: done. Terminal prompt in `harness serve`/`run`, chained with API and Telegram (first answer wins); see `core/gateway/channels.py`, `tests/test_terminal_approvals.py`.
+- Release automation: done, `.github/workflows/release.yml` (tag → tests → wheel/sdist → PyPI trusted publishing → multi-arch GHCR image → GitHub release), checked by `tests/test_release_workflow.py`. It has not run against real PyPI/GHCR; the one-time PyPI trusted-publisher and `pypi` environment setup is yours.
