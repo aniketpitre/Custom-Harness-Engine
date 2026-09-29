@@ -1,0 +1,4 @@
+# Copy to config/hooks.yaml. Classic shell hooks: JSON payload on stdin, exit code 2 blocks.
+- event: pre_tool
+  command: ./scripts/check-change-window.sh
+  priority: 50

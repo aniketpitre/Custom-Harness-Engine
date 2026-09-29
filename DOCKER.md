@@ -1,27 +1,21 @@
-# Local Docker deployment
+# Docker deployment
 
-This Compose deployment starts a development-only Vault server, initializes the
-`harness-secrets` KV mount with the Groq credential, and then runs the harness.
-The harness container receives Vault connection settings, not the Groq key.
+`./start.sh` (or `docker compose up --build`) starts:
 
-Create the ignored local environment file and fill it in directly in your
-terminal:
-
-```bash
-cp .env.example .env
-$EDITOR .env
-```
-
-Then start the stack:
+1. **vault** - development-mode Vault, published on `127.0.0.1:8200` only.
+2. **vault-init** - seeds `harness-secrets/` with the root token, writes a `harness-read` policy and mints a
+   **read-only, renewable token** into a shared volume. The harness receives only that token file
+   (`VAULT_TOKEN_FILE`) - never the root token and never the raw provider key.
+3. **harness** - the API on `127.0.0.1:8000` (host loopback), non-root user, health-checked, persistent
+   `/app/data`, and a separate `/workspace` volume that is the only directory file/shell tools can touch.
 
 ```bash
-docker compose up --build
+cp .env.example .env && chmod 600 .env && $EDITOR .env     # or run ./start.sh to generate it
+docker compose up --build -d
+curl -H "Authorization: Bearer $HARNESS_API_TOKEN" http://127.0.0.1:8000/agents
+docker compose run --rm harness python -m core.gateway.cli "List the files in the workspace"
 ```
 
-The `harness` service runs the real CLI scenario after `vault-init` completes.
-The JSON run receipt is printed in the Compose output.
-
-This uses Vault dev mode and is for local development only. Dev-mode Vault
-data is not persistent and the root token is not suitable for production.
-Production should use an external persistent Vault deployment with TLS and a
-least-privileged policy.
+Vault dev mode is **not persistent and not for production**. Production: an external Vault with TLS,
+a least-privilege policy per environment, and short-lived tokens. To use Kubernetes tools, mount a
+read-only kubeconfig (commented in `docker-compose.yml`).

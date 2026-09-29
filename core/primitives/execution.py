@@ -21,6 +21,8 @@ class ActionRecord(BaseModel):
     pre_state_snapshot: dict[str, object] | None = None
     post_state_snapshot: dict[str, object] | None = None
     rollback_available: bool = False
+    args_hash: str | None = None
+    is_error: bool = False
 
 
 class RunReceipt(BaseModel):
@@ -36,6 +38,9 @@ class RunReceipt(BaseModel):
     final_text: str = ""
     message_history: list[dict[str, object]] | None = None
     status: str = Field(pattern="^(running|success|failure|blocked)$", default="running")
+    outcome: str | None = None
+    verified: bool | None = None
+    chain_head: str | None = None
     started_at: datetime
     finished_at: datetime | None = None
     teardown_tasks: list[str] = Field(default_factory=list)

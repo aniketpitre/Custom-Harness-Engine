@@ -1,79 +1,59 @@
 #!/bin/bash
-set -e
+# Single-command setup: writes a private .env, then starts Vault + the harness with Docker Compose.
+set -euo pipefail
 
-echo "Welcome to Harness Engine Single-Command Setup!"
-echo "-----------------------------------------------"
+echo "Harness Engine setup"
+echo "--------------------"
 
 if [ ! -f .env ]; then
-    echo "Creating .env configuration..."
-    
-    # Generate random vault token
-    VAULT_TOKEN=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    echo "VAULT_DEV_ROOT_TOKEN_ID=$VAULT_TOKEN" > .env
-    
-    echo "Choose your LLM Provider:"
-    echo "1) Groq (Default)"
-    echo "2) OpenAI"
-    echo "3) Anthropic"
-    echo "4) OpenRouter"
-    echo "5) NVIDIA Build"
-    echo "6) Local Model (Ollama/LM Studio)"
-    read -p "Select [1-6]: " PROVIDER_SELECTION
-    
-    MODEL="groq/openai/gpt-oss-120b"
-    VAULT_PROVIDER_KEY="groq"
-    
-    if [ "$PROVIDER_SELECTION" = "2" ]; then
-        MODEL="gpt-4o"
-        read -p "Enter OpenAI API Key: " API_KEY
-        echo "OPENAI_API_KEY=$API_KEY" >> .env
-        VAULT_PROVIDER_KEY="openai"
-    elif [ "$PROVIDER_SELECTION" = "3" ]; then
-        MODEL="claude-3-5-sonnet-20240620"
-        read -p "Enter Anthropic API Key: " API_KEY
-        echo "ANTHROPIC_API_KEY=$API_KEY" >> .env
-        VAULT_PROVIDER_KEY="anthropic"
-    elif [ "$PROVIDER_SELECTION" = "4" ]; then
-        MODEL="openrouter/auto"
-        read -p "Enter OpenRouter API Key: " API_KEY
-        echo "OPENROUTER_API_KEY=$API_KEY" >> .env
-        VAULT_PROVIDER_KEY="openrouter"
-    elif [ "$PROVIDER_SELECTION" = "5" ]; then
-        MODEL="nvidia/llama-3.1-70b-instruct"
-        read -p "Enter NVIDIA API Key: " API_KEY
-        echo "NVIDIA_API_KEY=$API_KEY" >> .env
-        VAULT_PROVIDER_KEY="nvidia"
-    elif [ "$PROVIDER_SELECTION" = "6" ]; then
-        MODEL="openai/local"
-        read -p "Enter Local Base URL (e.g. http://localhost:11434/v1): " LOCAL_URL
-        echo "OPENAI_API_BASE=$LOCAL_URL" >> .env
-        echo "OPENAI_API_KEY=dummy_key" >> .env
-        API_KEY="dummy_key"
-        VAULT_PROVIDER_KEY="openai"
+    umask 077   # .env holds secrets: owner-only
+    rand() { LC_ALL=C tr -dc 'a-zA-Z0-9' </dev/urandom | head -c 40; }
+
+    echo "Choose your LLM provider:"
+    echo "1) Groq (default)  2) OpenAI  3) Anthropic  4) OpenRouter  5) NVIDIA  6) Local (Ollama/LM Studio)"
+    read -r -p "Select [1-6]: " SEL
+    case "$SEL" in
+        2) PROVIDER=openai;     DEFAULT_MODEL="openai/gpt-4o" ;;
+        3) PROVIDER=anthropic;  DEFAULT_MODEL="anthropic/claude-sonnet-4-5" ;;
+        4) PROVIDER=openrouter; DEFAULT_MODEL="openrouter/auto" ;;
+        5) PROVIDER=nvidia;     DEFAULT_MODEL="nvidia_nim/meta/llama-3.1-70b-instruct" ;;
+        6) PROVIDER=openai;     DEFAULT_MODEL="openai/local" ;;
+        *) PROVIDER=groq;       DEFAULT_MODEL="groq/openai/gpt-oss-120b" ;;
+    esac
+    read -r -p "Model [$DEFAULT_MODEL]: " MODEL
+    MODEL=${MODEL:-$DEFAULT_MODEL}
+    if [ "$SEL" = "6" ]; then
+        read -r -p "Local base URL (e.g. http://host.docker.internal:11434/v1): " BASE_URL
+        KEY="local-no-key"
     else
-        read -p "Enter Groq API Key: " API_KEY
-        echo "GROQ_API_KEY=$API_KEY" >> .env
+        read -r -s -p "$PROVIDER API key: " KEY; echo
     fi
-    
-    echo "HARNESS_MODEL=$MODEL" >> .env
-    echo "VAULT_PROVIDER_KEY=$VAULT_PROVIDER_KEY" >> .env
-    echo "PROVIDER_API_KEY=$API_KEY" >> .env
-    
-    echo ""
-    read -p "Enter your Telegram Bot Token: " BOT_TOKEN
-    read -p "Enter your Telegram Approval Chat ID: " CHAT_ID
-    echo "TELEGRAM_BOT_TOKEN=$BOT_TOKEN" >> .env
-    echo "TELEGRAM_APPROVAL_CHAT_ID=$CHAT_ID" >> .env
-    
-    echo ""
-    echo ".env file generated successfully!"
+    read -r -p "Telegram bot token (blank to approve via the API instead): " BOT
+    CHAT=""; APPROVERS=""
+    if [ -n "$BOT" ]; then
+        read -r -p "Telegram approval chat id: " CHAT
+        read -r -p "Telegram user id allowed to approve: " UID_
+        APPROVERS="telegram:${UID_}"
+    fi
+
+    {
+        echo "VAULT_DEV_ROOT_TOKEN_ID=$(rand)"
+        echo "HARNESS_API_TOKEN=$(rand)"
+        echo "VAULT_PROVIDER_KEY=$PROVIDER"
+        echo "PROVIDER_API_KEY=$KEY"
+        echo "HARNESS_MODEL=$MODEL"
+        echo "TELEGRAM_BOT_TOKEN=$BOT"
+        echo "TELEGRAM_APPROVAL_CHAT_ID=$CHAT"
+        echo "HARNESS_APPROVERS=$APPROVERS"
+        [ -n "${BASE_URL:-}" ] && echo "OPENAI_API_BASE=${BASE_URL}"
+    } > .env
+    chmod 600 .env
+    echo ".env written (mode 600). Your API token is in .env as HARNESS_API_TOKEN."
 else
     echo "Existing .env found. Continuing..."
 fi
 
-echo ""
 echo "Starting via Docker Compose..."
-docker-compose up --build -d
-
-echo ""
-echo "Harness Engine is running! You can view logs with: docker-compose logs -f harness"
+docker compose up --build -d
+echo "Harness Engine API: http://127.0.0.1:8000  (Authorization: Bearer <HARNESS_API_TOKEN>)"
+echo "Logs: docker compose logs -f harness"

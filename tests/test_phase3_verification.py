@@ -1,8 +1,5 @@
 """Phase 3: Verification — verify_file_content and wiring into context."""
 from core.verification import verify_file_content
-from core.primitives.context import ContextPacket
-from core.primitives.goal import Goal, TriggerSource
-from core.agent_engine import _run_requested_verification
 from datetime import datetime, timezone
 
 NOW = datetime.now(timezone.utc)
@@ -29,21 +26,25 @@ def test_verification_reports_missing(tmp_path):
     assert result.observed == "<missing>"
 
 
-def test_run_requested_verification_returns_none_without_request():
-    ctx = ContextPacket(
-        goal=Goal(id="g1", source=TriggerSource.cli, raw_input="test", created_at=NOW),
-        live_state={},
-    )
-    assert _run_requested_verification(ctx) is None
+async def test_run_verification_none_without_request():
+    from core.verifiers import run_verification
+
+    assert await run_verification(None) is None
 
 
-def test_run_requested_verification_with_valid_request(tmp_path):
+async def test_run_verification_legacy_spec_and_typed_spec(tmp_path):
+    from core.verifiers import run_verification
+
     f = tmp_path / "v.txt"
     f.write_text("content")
-    ctx = ContextPacket(
-        goal=Goal(id="g1", source=TriggerSource.cli, raw_input="test", created_at=NOW),
-        live_state={"verification": {"path": str(f), "expected_content": "content"}},
-    )
-    result = _run_requested_verification(ctx)
-    assert result is not None
-    assert result.passed is True
+    legacy = await run_verification({"path": str(f), "expected_content": "content"})
+    typed = await run_verification({"type": "file_content", "path": str(f), "expected_content": "nope"})
+    assert legacy.passed is True and typed.passed is False
+
+
+async def test_unknown_or_broken_verifier_is_a_failed_verification():
+    from core.verifiers import run_verification
+
+    assert (await run_verification({"type": "nonsense"})).passed is False
+    broken = await run_verification({"type": "file_content", "path": 5})
+    assert broken.passed is False and "error" in broken.observed

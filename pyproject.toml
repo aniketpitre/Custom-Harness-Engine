@@ -4,27 +4,45 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "harness-engine"
-version = "0.1.0"
-requires-python = ">=3.12"
+version = "0.2.0"
+requires-python = ">=3.11"
+# Core runtime only. Domain packs and integrations are optional extras and import lazily.
 dependencies = [
     "pydantic>=2.6",
-    "claude-agent-sdk",
-    "mcp",
     "litellm",
-    "python-telegram-bot>=21.0",
-    "kubernetes",
-    "GitPython",
-    "hvac",
-    "opentelemetry-sdk",
-    "opentelemetry-exporter-otlp",
     "fastapi",
     "uvicorn",
-    "apscheduler",
+    "apscheduler>=3.10,<4",
     "httpx",
-    "pytest",
-    "pytest-asyncio",
     "pyyaml",
+    "jsonschema",
+    "opentelemetry-api",
+    "opentelemetry-sdk",
 ]
 
+[project.optional-dependencies]
+telegram = ["python-telegram-bot>=21.0"]
+vault = ["hvac"]
+devops = ["kubernetes", "GitPython"]
+mcp = ["mcp"]
+otel = ["opentelemetry-exporter-otlp", "opentelemetry-instrumentation-litellm"]
+setup = ["questionary"]
+runtime = ["harness-engine[telegram,vault,devops,mcp,otel]"]
+dev = ["pytest", "pytest-asyncio", "ruff", "harness-engine[runtime,setup]"]
+
 [tool.setuptools.packages.find]
-include = ["core*", "domains*", "receipts*"]
+include = ["core*", "domains*", "receipts*", "cli*"]
+
+[tool.setuptools.package-data]
+"domains.devops" = ["skills/*/SKILL.md"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I"]
+ignore = ["E501", "B008", "E701", "E702", "B904", "E402"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B", "E731", "F841", "F401", "I001"]

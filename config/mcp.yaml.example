@@ -1,0 +1,8 @@
+# Copy to config/mcp.yaml. Tools appear as mcp__<server>__<tool> and go through the same policy path.
+servers:
+  - name: github
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: GITHUB_TOKEN   # child env name: harness env var to copy from
+    read_only_tools: ["get_*", "list_*", "search_*"]   # R0 + untrusted; every other tool needs approval

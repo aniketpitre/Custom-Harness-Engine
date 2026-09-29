@@ -6,7 +6,6 @@ from kubernetes import client, config
 from core.secrets import get_secret
 from domains.devops.tools._mcp import FastMCP
 
-
 mcp = FastMCP("devops-kubectl")
 _core_v1: client.CoreV1Api | None = None
 
@@ -14,8 +13,14 @@ _core_v1: client.CoreV1Api | None = None
 def _get_core_v1() -> client.CoreV1Api:
     global _core_v1
     if _core_v1 is None:
-        kubeconfig_path = get_secret("kubernetes", "kubeconfig_path")
-        config.load_kube_config(config_file=kubeconfig_path)
+        try:
+            kubeconfig_path = get_secret("kubernetes", "kubeconfig_path")
+        except Exception:  # noqa: BLE001 - fall back to KUBECONFIG / ~/.kube/config / in-cluster
+            kubeconfig_path = None
+        try:
+            config.load_kube_config(config_file=kubeconfig_path)
+        except Exception:  # noqa: BLE001
+            config.load_incluster_config()
         _core_v1 = client.CoreV1Api()
     return _core_v1
 

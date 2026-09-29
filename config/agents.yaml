@@ -5,6 +5,11 @@
     - Read
     - DevOpsRead
     - DevOpsWrite
+    - Memory
+    - Advisor
+  max_turns: 30
+  rules:
+    - "deny:bash(git push --force*)"
 
 - id: read_only_explorer
   domain: devops

@@ -1,6 +1,7 @@
 from core.primitives.policy import RiskTier
 
-
+# Base tier per (tool, action). Argument-aware adjustments (protected namespaces, production
+# apps) live in domains/devops/plugin.py and can only raise a tier, never lower it.
 TOOL_RISK_TABLE = {
     ("filesystem", "read_directory"): RiskTier.R0,
     ("kubectl", "get"): RiskTier.R0,

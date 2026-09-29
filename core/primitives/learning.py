@@ -1,6 +1,6 @@
-from enum import StrEnum
 import ast
 import re
+from enum import StrEnum
 from pathlib import Path
 from uuid import uuid4
 
@@ -55,10 +55,11 @@ def draft_skill_if_warranted(receipt) -> CandidateSkill | None:
         return None
     name = _skill_name(receipt.goal.raw_input)
     actions = "\n".join(
-        f"- Inspect `{action.tool}.{action.action}` evidence"
-        for action in receipt.actions
+        f"{i}. `{action.tool}.{action.action}` (risk {action.policy_decision.risk_tier})"
+        for i, action in enumerate(receipt.actions, 1)
     )
-    body = f"# {name}\n\n## Procedure\n{actions}\n\n## Verification\nUse the run verification condition.\n"
+    body = (f"# {name}\n\n## When to Use\n{receipt.goal.raw_input[:200]}\n\n## Procedure\n{actions}\n\n"
+            f"## Verification\nExpected: {receipt.verification.expected[:200]}\n")
     return CandidateSkill(
         id=str(uuid4()),
         name=name,
@@ -82,7 +83,14 @@ def run_validation_test(validation_test: str) -> bool:
     return left == right
 
 
-def write_skill_to_registry(candidate: CandidateSkill, registry_root: str | Path = "domains/devops/skills") -> Path:
+def _default_root() -> Path:
+    from core.settings import settings
+
+    return settings().skills_dir
+
+
+def write_skill_to_registry(candidate: CandidateSkill, registry_root: str | Path | None = None) -> Path:
+    registry_root = registry_root or _default_root()
     if candidate.status is not CandidateSkillStatus.validated:
         raise ValueError("Only validated skills can be written to the registry")
     if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", candidate.name):
@@ -94,6 +102,7 @@ def write_skill_to_registry(candidate: CandidateSkill, registry_root: str | Path
         "---\n"
         f"name: {candidate.name}\n"
         f"version: {candidate.version}\n"
+        f"description: Learned procedure for: {candidate.name.replace('-', ' ')}\n"
         "authorship: agent-created\n"
         f"derived_from_run: {candidate.derived_from_run}\n"
         "---\n\n"
@@ -103,18 +112,13 @@ def write_skill_to_registry(candidate: CandidateSkill, registry_root: str | Path
     return skill_path
 
 
-async def promote_candidate_skill(candidate: CandidateSkill, registry_root: str | Path = "domains/devops/skills") -> CandidateSkill:
-    # Phase 13.4 Static Analysis: Reject suspicious patterns automatically
-    suspicious_patterns = [
-        r"http[s]?://",
-        r"password\s*=.*|secret\s*=",
-        r"disable[-_]check",
-        r"--no-verify",
-    ]
-    for pattern in suspicious_patterns:
-        if re.search(pattern, candidate.proposed_body, re.IGNORECASE):
-            candidate.transition_to(CandidateSkillStatus.rejected)
-            return candidate
+async def promote_candidate_skill(candidate: CandidateSkill, registry_root: str | Path | None = None) -> CandidateSkill:
+    # Static analysis: reject suspicious content before a human is even asked
+    from core.safety import scan_text
+
+    if scan_text(candidate.proposed_body):
+        candidate.transition_to(CandidateSkillStatus.rejected)
+        return candidate
 
     from core.gateway.telegram import request_approval
 

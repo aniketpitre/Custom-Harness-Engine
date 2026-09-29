@@ -1,37 +1,45 @@
-import os
-import questionary
+"""Interactive setup: stores provider and Telegram credentials in Vault and prints next steps."""
+import secrets as pysecrets
+
 from core.secrets import get_vault_client
 
-def setup():
+PROVIDERS = {
+    "Groq": ("groq", "groq/openai/gpt-oss-120b"),
+    "OpenRouter": ("openrouter", "openrouter/auto"),
+    "Anthropic": ("anthropic", "anthropic/claude-sonnet-4-5"),
+    "OpenAI": ("openai", "openai/gpt-4o"),
+    "NVIDIA": ("nvidia", "nvidia_nim/meta/llama-3.1-70b-instruct"),
+}
+
+
+def setup() -> None:
+    import questionary  # optional dependency: pip install "harness-engine[setup]"
+
     print("Welcome to Harness Engine Setup!")
-
-    # Simple setup for Telegram
-    bot_token = questionary.password("Enter your Telegram Bot Token:").ask()
-    chat_id = questionary.text("Enter your Telegram Approval Chat ID:").ask()
-
-    # Write to local mock vault for this example (since we don't have a real vault running)
     client = get_vault_client()
+    mount = "harness-secrets"
+
+    provider_label = questionary.select("Choose your primary LLM provider:", choices=list(PROVIDERS)).ask()
+    provider, default_model = PROVIDERS[provider_label]
+    key = questionary.password(f"Enter your {provider_label} API key:").ask()
     client.secrets.kv.v2.create_or_update_secret(
-        path="telegram",
-        secret=dict(bot_token=bot_token, approval_chat_id=chat_id),
-        mount_point="harness-secrets",
-    )
-    print("Telegram secrets saved to Vault.")
+        path="llm", secret=dict(provider=provider, api_key=key), mount_point=mount)
+    model = questionary.text("Model:", default=default_model).ask()
 
-    # LLM Providers
-    provider = questionary.select(
-        "Choose your primary LLM provider:",
-        choices=["OpenRouter", "Anthropic", "OpenAI", "NVIDIA", "Local (Ollama/LM Studio)"]
-    ).ask()
+    token = pysecrets.token_hex(32)
+    client.secrets.kv.v2.create_or_update_secret(path="harness", secret=dict(api_token=token), mount_point=mount)
 
-    if provider != "Local (Ollama/LM Studio)":
-        key = questionary.password(f"Enter your {provider} API Key:").ask()
+    if questionary.confirm("Configure Telegram approvals?", default=True).ask():
+        bot = questionary.password("Telegram bot token:").ask()
+        chat = questionary.text("Approval chat id:").ask()
         client.secrets.kv.v2.create_or_update_secret(
-            path="llm",
-            secret=dict(provider=provider, api_key=key),
-            mount_point="harness-secrets",
-        )
-        print(f"{provider} credentials saved.")
+            path="telegram", secret=dict(bot_token=bot, approval_chat_id=chat), mount_point=mount)
+
+    print("\nSecrets saved to Vault.")
+    print(f"Set HARNESS_MODEL={model}")
+    print("The API token was stored at harness-secrets/harness (read it with `vault kv get`).")
+    print("Start the API with: python main.py")
+
 
 if __name__ == "__main__":
     setup()

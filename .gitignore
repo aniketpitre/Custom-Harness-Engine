@@ -1,11 +1,18 @@
 .venv/
+.venv-new/
 __pycache__/
 *.pyc
 *.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
 .env
 data/
+.workspace/
 secrets/*.local
 config/settings.local.yaml
+config/mcp.yaml
+config/hooks.yaml
 # Local full workspace backups
 Custom-Harness-Engine-full-backup-*.zip
-.venv-new/

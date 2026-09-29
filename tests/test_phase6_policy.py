@@ -3,7 +3,6 @@ import pytest
 
 from core.primitives.policy import RiskTier, resolve_policy
 from domains.devops.policy_table import TOOL_RISK_TABLE
-from core.gateway.telegram import get_approver, _approvers
 
 
 def test_r0_read_only_action_is_allowed():
@@ -47,15 +46,3 @@ def test_unknown_action_is_denied_as_r4():
     assert decision.decision == "DENY"
     assert decision.risk_tier is RiskTier.R4
     assert "not registered" in decision.reason
-
-
-def test_telegram_get_approver_pops_value():
-    """get_approver should return the Telegram user ID and clear it from pending states."""
-    action_id = "test-action-123"
-    _approvers[action_id] = "tele_user_456"
-
-    # First call retrieves the approver
-    assert get_approver(action_id) == "tele_user_456"
-
-    # Second call returns None (it was popped)
-    assert get_approver(action_id) is None

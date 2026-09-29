@@ -1,37 +1,41 @@
+"""GitOps: propose a change as a pull request from an isolated git worktree.
+
+The user's checkout is never touched: the change is made in a temporary worktree on a new
+branch, pushed, opened as a PR with `gh`, and the worktree and local branch are removed.
+"""
+from __future__ import annotations
+
 import re
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
-from git import Repo
-
+from core.confine import safe_env
 from core.primitives.policy import PolicyDecision, RiskTier
+from domains.devops.policy_table import TOOL_RISK_TABLE
 
 _BRANCH_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$")
+# One source of truth: the GitOps-managed subset of the risk table.
 GITOPS_MANAGED_ACTIONS = {
-    ("kubectl", "restart_pod"): RiskTier.R2,
-    ("argocd", "app_sync_staging"): RiskTier.R2,
-    ("argocd", "app_sync_production"): RiskTier.R3,
-    ("gitops", "propose_change"): RiskTier.R2,
+    k: v for k, v in TOOL_RISK_TABLE.items()
+    if k[0] in {"gitops", "argocd"} or k == ("kubectl", "restart_pod")
 }
 
 
 def resolve_gitops_route(tool: str, action: str) -> PolicyDecision:
     risk_tier = GITOPS_MANAGED_ACTIONS.get((tool, action))
     if risk_tier is None:
-        return PolicyDecision(
-            decision="DENY",
-            risk_tier=RiskTier.R4,
-            reason="Action has no registered GitOps route",
-            tool=tool,
-            action=action,
-        )
-    return PolicyDecision(
-        decision="REQUIRE_APPROVAL",
-        risk_tier=risk_tier,
-        reason="GitOps change requires approval before PR creation",
-        tool=tool,
-        action=action,
-    )
+        return PolicyDecision(decision="DENY", risk_tier=RiskTier.R4,
+                              reason="Action has no registered GitOps route", tool=tool, action=action)
+    return PolicyDecision(decision="REQUIRE_APPROVAL", risk_tier=risk_tier,
+                          reason="GitOps change requires approval before PR creation", tool=tool, action=action)
+
+
+def allowed_repo(repo_path: str | Path, allowlist: tuple[str, ...], workspace: Path) -> bool:
+    repo = Path(repo_path).resolve()
+    roots = [Path(p).resolve() for p in allowlist] or [workspace.resolve()]
+    return any(repo == r or r in repo.parents for r in roots)
 
 
 def create_change_pr(
@@ -44,57 +48,55 @@ def create_change_pr(
     pr_body: str,
     remote_name: str = "origin",
 ) -> str:
-    """Create, push, and open a GitHub PR for one explicit file change.
+    """Create, push and open a PR for one file change. Caller must have approval."""
+    from git import Repo
 
-    The caller must perform policy and human approval before invoking this mutating
-    operation. The working tree must be clean and the target path must remain inside
-    the repository.
-    """
-    if not _BRANCH_PATTERN.fullmatch(branch_name) or branch_name in {"main", "master"}:
+    if not _BRANCH_PATTERN.fullmatch(branch_name) or branch_name in {"main", "master"} or ".." in branch_name:
         raise ValueError("Invalid or protected branch name")
     if not commit_message.strip() or not pr_title.strip():
         raise ValueError("Commit message and PR title are required")
 
-    repo_path = Path(repo_path).resolve()
-    repo = Repo(repo_path)
-    if repo.is_dirty(untracked_files=True):
-        raise RuntimeError("GitOps action requires a clean working tree")
-    if remote_name not in {remote.name for remote in repo.remotes}:
+    repo = Repo(Path(repo_path).resolve())
+    if remote_name not in {r.name for r in repo.remotes}:
         raise RuntimeError(f"Git remote not found: {remote_name}")
-
-    target = (Path(repo.working_tree_dir) / file_path).resolve()
-    # Check if target is inside the working directory
-    try:
-        target.relative_to(Path(repo.working_tree_dir).resolve())
-    except ValueError:
-        raise ValueError("Target path must be within the repository")
-    target.parent.mkdir(parents=True, exist_ok=True)
-
-    if branch_name in {head.name for head in repo.heads}:
+    if branch_name in {h.name for h in repo.heads}:
         raise RuntimeError(f"Branch already exists: {branch_name}")
-    branch = repo.create_head(branch_name)
-    branch.checkout()
+
+    tmp = Path(tempfile.mkdtemp(prefix="harness-gitops-"))
+    worktree = tmp / "wt"
     try:
+        repo.git.worktree("add", "-b", branch_name, str(worktree), "HEAD")
+        wt = Repo(worktree)
+        target = (worktree / file_path).resolve()
+        if worktree.resolve() not in target.parents:
+            raise ValueError("Target path must be within the repository")
+        if ".git" in target.relative_to(worktree.resolve()).parts:
+            raise ValueError("Refusing to write inside .git")
+        target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
-        repo.index.add([str(target.relative_to(repo.working_tree_dir))])
-        if not repo.index.diff("HEAD"):
+        wt.index.add([str(target.relative_to(worktree.resolve()))])
+        if not wt.index.diff("HEAD"):
             raise RuntimeError("GitOps action produced no file change")
-        repo.index.commit(commit_message)
-        repo.remote(remote_name).push(branch_name)
+        wt.index.commit(commit_message)
+        wt.remote(remote_name).push(branch_name)
         result = subprocess.run(
             ["gh", "pr", "create", "--title", pr_title, "--body", pr_body, "--head", branch_name],
-            cwd=repo.working_tree_dir,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
+            cwd=worktree, check=False, capture_output=True, text=True, timeout=60,
+            env=safe_env(extra_allow=("GITHUB_TOKEN", "GH_TOKEN", "GH_HOST")))
         if result.returncode != 0:
             raise RuntimeError(result.stderr.strip() or "GitHub PR creation failed")
         return result.stdout.strip()
     finally:
-        # Checkout the branch we were on previously
-        for ref in repo.heads:
-            if ref.name != branch_name:
-                ref.checkout()
-                break
+        try:
+            repo.git.worktree("remove", "--force", str(worktree))
+        except Exception:  # noqa: BLE001
+            shutil.rmtree(worktree, ignore_errors=True)
+            try:
+                repo.git.worktree("prune")
+            except Exception:  # noqa: BLE001
+                pass
+        try:
+            repo.git.branch("-D", branch_name)
+        except Exception:  # noqa: BLE001
+            pass
+        shutil.rmtree(tmp, ignore_errors=True)

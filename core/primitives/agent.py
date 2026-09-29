@@ -1,6 +1,7 @@
-from datetime import datetime, timezone
 import uuid
-from typing import List, Optional, Dict
+from datetime import datetime, timezone
+from typing import Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 from core.primitives.execution import RunReceipt
@@ -13,6 +14,13 @@ class AgentProfile(BaseModel):
     system_prompt: str = Field(min_length=1)
     allowed_tools: List[str] = Field(default_factory=list)
     model: Optional[str] = None
+    version: int = 1
+    max_turns: Optional[int] = None
+    token_budget: Optional[int] = None
+    deny_tools: List[str] = Field(default_factory=list)
+    rules: List[str] = Field(default_factory=list)  # e.g. "deny:bash(rm *)", "ask:web_fetch"
+    verification: Optional[Dict[str, str]] = None
+    verify_with_agent: bool = False  # independent read-only verifier agent checks the final answer
 
 
 class Session(BaseModel):

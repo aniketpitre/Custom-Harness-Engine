@@ -2,10 +2,16 @@ import json
 import shutil
 import subprocess
 
+from core.confine import safe_env
 from domains.devops.tools._mcp import FastMCP
 
-
 mcp = FastMCP("devops-argocd")
+
+
+def _check_name(name: str) -> str:
+    if not name or name.startswith("-"):
+        raise ValueError(f"Invalid application name: {name!r}")
+    return name
 
 
 def _run_argocd(arguments: list[str]) -> str:
@@ -19,6 +25,7 @@ def _run_argocd(arguments: list[str]) -> str:
         capture_output=True,
         text=True,
         timeout=30,
+        env=safe_env(),
     )
     if result.returncode != 0:
         message = result.stderr.strip() or result.stdout.strip() or "unknown argocd error"
@@ -36,14 +43,14 @@ def argocd_app_list() -> str:
 @mcp.tool()
 def argocd_app_get(app_name: str) -> str:
     """Read-only: inspect one ArgoCD application as JSON."""
-    output = _run_argocd(["app", "get", app_name, "--output", "json"])
+    output = _run_argocd(["app", "get", _check_name(app_name), "--output", "json"])
     return json.dumps(json.loads(output), sort_keys=True)
 
 
 @mcp.tool()
 def argocd_app_sync(app_name: str) -> str:
     """Action: sync one ArgoCD application."""
-    output = _run_argocd(["app", "sync", app_name])
+    output = _run_argocd(["app", "sync", _check_name(app_name)])
     return output
 
 if __name__ == "__main__":

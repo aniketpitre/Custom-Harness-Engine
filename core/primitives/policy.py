@@ -1,13 +1,8 @@
 from enum import StrEnum
 
-
-from opentelemetry import trace
-try:
-    tracer = trace.get_tracer(__name__)
-except Exception:
-    pass
-
 from pydantic import BaseModel, ConfigDict, Field
+
+from core.telemetry import get_tracer, policy_counter
 
 
 class RiskTier(StrEnum):
@@ -38,12 +33,13 @@ def resolve_policy(
     risk_table: dict[tuple[str, str], RiskTier] | None = None,
     approved_by: str | None = None,
 ) -> PolicyDecision:
-    with tracer.start_as_current_span("resolve_policy") as span:
+    with get_tracer(__name__).start_as_current_span("resolve_policy") as span:
         span.set_attribute("policy.tool", tool)
         span.set_attribute("policy.action", action)
         decision = _resolve_policy_internal(tool, action, risk_table, approved_by)
         span.set_attribute("policy.decision", decision.decision)
         span.set_attribute("policy.risk_tier", str(decision.risk_tier))
+        policy_counter.add(1, {"decision": decision.decision})
         return decision
 
 def _resolve_policy_internal(

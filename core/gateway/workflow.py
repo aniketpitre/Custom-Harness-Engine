@@ -1,12 +1,13 @@
+import argparse
 import asyncio
 import uuid
-import sys
-import argparse
-from datetime import datetime
-from core.primitives.goal import Goal, TriggerSource
-from core.primitives.context import ContextPacket
-from core.primitives.orchestration import OrchestrationPlan, Phase, SubagentSpec
+from datetime import datetime, timezone
+
 from core.orchestration.executor import execute_plan
+from core.primitives.context import ContextPacket
+from core.primitives.goal import Goal, TriggerSource
+from core.primitives.orchestration import OrchestrationPlan, Phase, SubagentSpec
+
 
 async def run_audit_workflow(resume=False):
     # Step 12.5 Test Case Plan
@@ -35,7 +36,7 @@ async def run_audit_workflow(resume=False):
             id=str(uuid.uuid4()),
             source=TriggerSource.cli,
             raw_input=plan.goal,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
             domain="devops"
         ),
         memory_hits=[],
@@ -46,12 +47,12 @@ async def run_audit_workflow(resume=False):
 
     print(f"Starting orchestration plan: {plan.goal}")
     print(f"Workflow ID: {plan.id}\n")
-    
+
     try:
         results = await execute_plan(plan, context)
         print("\n=== FINAL CONFIRMED ISSUES ===")
         # The final phase contains the cross-checked issues
-        for idx, subagent_res in enumerate(results[-1]):
+        for subagent_res in results[-1]:
             if "error" in subagent_res:
                 print(f"Subagent Error: {subagent_res['error']}")
             else:

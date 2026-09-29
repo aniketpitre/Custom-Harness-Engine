@@ -1,33 +1,60 @@
 # Harness Engine User Guide
 
-Welcome to Harness Engine! This guide will help you set up and use the agentic framework.
+## 1. Configure
 
-## 1. Setup Wizard
+Everything is configured with environment variables (`HARNESS_*`), optionally `config/settings.yaml`
+(`model.primary`, `model.fallback`, `otel.endpoint`). Secrets come from the environment first, then Vault.
 
-To get started with Harness Engine, use the automated setup wizard. This will configure your API connections for various LLM providers and set up your Telegram bot for approval notifications.
+| Variable | Purpose | Default |
+|---|---|---|
+| `HARNESS_API_TOKEN` | Bearer token for the API. **Required** (no default). Extra scoped tokens: `HARNESS_API_TOKENS='{"tok": ["sessions:read"]}'` | - |
+| `HARNESS_MODEL`, `HARNESS_FALLBACK_MODELS` | LiteLLM model and failover chain | `groq/openai/gpt-oss-120b` |
+| `HARNESS_WORKSPACE` | The only directory file/shell tools may touch | current directory |
+| `HARNESS_APPROVERS` | Allowed approver ids, e.g. `telegram:123,api:*` | any member of the approval chat |
+| `HARNESS_APPROVAL_TIMEOUT` | Seconds before an unanswered approval is denied | 300 |
+| `HARNESS_GITOPS_REPOS` | Repositories the agent may open PRs against | the workspace |
+| `HARNESS_STAGING_APPS` | ArgoCD app globs treated as staging (R2); all others are R3 | none |
+| `HARNESS_SANDBOX` | `none` / `bwrap` / `docker` for the bash tool (fails closed if unavailable) | `none` |
+| `HARNESS_TOKEN_BUDGET`, `HARNESS_MAX_TURNS`, `HARNESS_MAX_SECONDS` | Run limits | 200000 / 30 / 3600 |
+| `HARNESS_CONTEXT_WINDOW`, `HARNESS_KEEP_RECENT_TOKENS` | Compaction thresholds | 128000 / 20000 |
+| `HARNESS_RECEIPT_KEY` | HMAC key for the event-log hash chain | unset (plain SHA-256) |
+| `HARNESS_WEBHOOK_ENDPOINTS`, `HARNESS_WEBHOOK_SECRET` | Signed completion webhooks | none |
 
-```bash
-python3 -m cli.setup
+## 2. Agents (`config/agents.yaml`)
+
+```yaml
+- id: sre
+  domain: devops
+  system_prompt: "You are an SRE."
+  allowed_tools: [Read, DevOpsRead, DevOpsWrite, Memory]
+  max_turns: 20
+  token_budget: 100000
+  deny_tools: [web_search]
+  rules: ["deny:bash(git push --force*)", "ask:web_fetch"]   # deny > ask > allow, first match wins
+  verification: {type: argocd_health, app_name: web}          # default verification for its runs
+  verify_with_agent: true                                     # independent read-only verifier
 ```
 
-The wizard will prompt you for:
-- **LLM API Keys**: OpenRouter, Anthropic, OpenAI, NVIDIA, or local options like Ollama/LM Studio.
-- **Telegram Integration**: Your bot token and the chat ID for approval notifications.
-- **Vault Configuration**: These secrets will be stored in your HashiCorp Vault. Ensure your `VAULT_ADDR` and `VAULT_TOKEN` are set or provisioned via the wizard.
+Project instructions: put an `AGENTS.md` in the workspace (scanned for injection; loaded into the stable prompt prefix).
 
-## 2. Using the CLI
-
-You can interact with the Harness Engine directly from your CLI.
+## 3. Use it
 
 ```bash
-# Example
-python3 main.py
+curl -s -H "Authorization: Bearer $HARNESS_API_TOKEN" -X POST localhost:8000/sessions \
+  -d '{"agent_id":"sre","goal":"Why is checkout returning 502?","run":true}'
+curl -N -H "Authorization: Bearer $HARNESS_API_TOKEN" localhost:8000/sessions/<id>/stream
 ```
 
-## 3. Telegram Integration
+Approvals arrive on Telegram (buttons: approve once / approve for session / deny) or via `GET /approvals` and
+`POST /approvals/{id}`. Unanswered approvals are denied after the timeout, and the model is told why.
 
-Once configured with `setup`, the Engine can send approval requests to your Telegram bot.
+## 4. Extend it
 
-1. **Bot Creation**: Create a bot via BotFather on Telegram.
-2. **Approval Chat ID**: Add the bot to a chat and use a bot to find the ID of that chat.
-3. **Execution**: When the engine requires approval (e.g., critical tool calls), it will message you on Telegram with "Approve" and "Deny" buttons.
+- **MCP servers:** copy `config/mcp.yaml.example` to `config/mcp.yaml`. Tools become `mcp__<server>__<tool>`.
+- **Hooks:** `config/hooks.yaml.example`. A `pre_tool` hook may deny/ask or rewrite arguments (exit code 2 blocks);
+  a `stop` hook can force the agent to continue (this is how you enforce a verification step).
+- **Plugins:** subclass `core.plugins.base.Plugin`, register tools/hooks/services in `register(ctx)`, load with
+  `engine.plugins.load(...)`. Reload and unload are transactional.
+- **Skills:** `SKILL.md` files under `domains/*/skills/` or `data/skills/`. The agent sees a name/description
+  index and loads bodies with `skill_view`; `skill_manage` writes are approval-gated and scanned.
+- **Heartbeat:** `POST /heartbeat` runs an agent every N minutes against the standing instructions in `HEARTBEAT.md`.

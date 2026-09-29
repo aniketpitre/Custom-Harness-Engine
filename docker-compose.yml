@@ -11,7 +11,7 @@ services:
       - -dev
       - -dev-root-token-id=${VAULT_DEV_ROOT_TOKEN_ID:?Set VAULT_DEV_ROOT_TOKEN_ID in .env}
     ports:
-      - "8200:8200"
+      - "127.0.0.1:8200:8200"
     healthcheck:
       test: ["CMD-SHELL", "vault status >/dev/null 2>&1"]
       interval: 2s
@@ -19,41 +19,55 @@ services:
       retries: 30
       start_period: 5s
 
+  # Seeds secrets with the dev root token, then mints a least-privilege read-only token for the
+  # harness. The harness never receives the root token or the raw provider key.
   vault-init:
     image: hashicorp/vault:1.20
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       vault:
         condition: service_healthy
     environment:
-      VAULT_ADDR: http://host.docker.internal:8200
+      VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID:?Set VAULT_DEV_ROOT_TOKEN_ID in .env}
       VAULT_PROVIDER_KEY: ${VAULT_PROVIDER_KEY:-groq}
       PROVIDER_API_KEY: ${PROVIDER_API_KEY:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN in .env}
-      TELEGRAM_APPROVAL_CHAT_ID: ${TELEGRAM_APPROVAL_CHAT_ID:?Set TELEGRAM_APPROVAL_CHAT_ID in .env}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_APPROVAL_CHAT_ID: ${TELEGRAM_APPROVAL_CHAT_ID:-}
+      HARNESS_API_TOKEN: ${HARNESS_API_TOKEN:?Set HARNESS_API_TOKEN in .env}
     entrypoint: ["/bin/sh", "/usr/local/bin/init-vault.sh"]
     volumes:
       - ./docker/init-vault.sh:/usr/local/bin/init-vault.sh:ro
+      - vault-token:/run/harness
 
   harness:
     build:
       context: .
-    network_mode: host
     depends_on:
       vault-init:
         condition: service_completed_successfully
     environment:
-      VAULT_ADDR: http://127.0.0.1:8200
-      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID:?Set VAULT_DEV_ROOT_TOKEN_ID in .env}
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN_FILE: /run/harness/vault_token
       VAULT_MOUNT_POINT: harness-secrets
       HARNESS_MODEL: ${HARNESS_MODEL:-groq/openai/gpt-oss-120b}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_API_BASE: ${OPENAI_API_BASE:-}
-      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-    command: ["python", "-m", "core.gateway.cli", "List the files in the current directory"]
-    restart: "no"
+      HARNESS_WORKSPACE: /workspace        # the only directory the file/shell tools can touch
+      HARNESS_API_TOKEN: ${HARNESS_API_TOKEN:?Set HARNESS_API_TOKEN in .env}
+      HARNESS_APPROVERS: ${HARNESS_APPROVERS:-}
+      HARNESS_GITOPS_REPOS: ${HARNESS_GITOPS_REPOS:-}
+      HARNESS_STAGING_APPS: ${HARNESS_STAGING_APPS:-}
+      HARNESS_WEBHOOK_ENDPOINTS: ${HARNESS_WEBHOOK_ENDPOINTS:-}
+      HARNESS_WEBHOOK_SECRET: ${HARNESS_WEBHOOK_SECRET:-}
+    ports:
+      - "127.0.0.1:8000:8000"   # published on the host loopback only
+    volumes:
+      - vault-token:/run/harness:ro
+      - harness-data:/app/data
+      - harness-workspace:/workspace
+      # - ${HOME}/.kube:/home/harness/.kube:ro     # uncomment for Kubernetes tools
+    restart: unless-stopped
+
+volumes:
+  vault-token:
+  harness-data:
+  harness-workspace:

@@ -1,0 +1,8 @@
+title = "harness-engine"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "test fixtures use obviously fake credentials"
+paths = ['''tests/.*''', '''docs/.*''', '''\.env\.example''']

@@ -1,65 +1,69 @@
+"""One-shot CLI: creates a durable session, runs it inline and prints the RunReceipt as JSON."""
+from __future__ import annotations
+
+import argparse
 import asyncio
-import sys
 import uuid
-from datetime import datetime, timezone
 
-from core.agent_engine import run_agent
-from core.memory.store import init_db, search_memory
-from core.primitives.context import ContextPacket
+from core.engine import get_engine
+from core.gateway.channels import start_telegram, terminal_channel
+from core.memory.store import create_session, get_session, init_db
 from core.primitives.execution import RunReceipt
-from core.primitives.goal import Goal, TriggerSource
-from core.primitives.learning import draft_skill_if_warranted
+from core.registry import AgentRegistry
+from core.runs import RunManager
 
-
-def build_context(raw_text: str, conn, verification_request: dict[str, str] | None = None) -> ContextPacket:
-    goal = Goal(
-        id=str(uuid.uuid4()),
-        source=TriggerSource.cli,
-        raw_input=raw_text,
-        created_at=datetime.now(timezone.utc),
-    )
-    return ContextPacket(
-        goal=goal,
-        memory_hits=search_memory(conn, raw_text, goal.domain),
-        live_state={"verification": verification_request} if verification_request else {},
-        recent_history=[],
-        tool_catalog=[],
-    )
+DEFAULT_AGENT = "devops_agent"
 
 
 async def handle_cli_input(
     raw_text: str,
-    verification_request: dict[str, str] | None = None,
+    verification_request: dict | None = None,
+    agent_id: str = DEFAULT_AGENT,
+    agents: AgentRegistry | None = None,
+    runs: RunManager | None = None,
 ) -> RunReceipt:
+    agents = agents or AgentRegistry()
+    engine = get_engine()
+    engine.extras["agents"] = agents
+    if agents.get_agent(agent_id) is None:
+        raise SystemExit(f"Unknown agent: {agent_id}")
+    runs = runs or RunManager(engine, agents)
+    await engine.ensure_started()
+    session_id = str(uuid.uuid4())
     conn = init_db()
     try:
-        context = build_context(raw_text, conn, verification_request)
+        create_session(conn, session_id, agent_id, raw_text, verification=verification_request)
     finally:
         conn.close()
-    goal = context.goal
-    result = await run_agent(context, allowed_tools=["Read", "DevOpsRead", "DevOpsWrite"])
-    verification = result["verification"]
-    receipt = RunReceipt(
-        run_id=str(uuid.uuid4()),
-        goal=goal,
-        agent_id="default-agent",
-        model_used=result["model_used"],
-        actions=result["actions"],
-        final_text=result["final_text"],
-        status="success" if verification is None or verification.passed else "failure",
-        verification=verification,
-        started_at=goal.created_at,
-        finished_at=datetime.now(timezone.utc),
-    )
-    receipt.candidate_skill = draft_skill_if_warranted(receipt)
-    return receipt
+    channel = start_telegram(engine.broker)
+    terminal = terminal_channel(engine.broker) if channel is None else None
+    try:
+        await runs.run_inline(session_id)
+    finally:
+        if channel:
+            await channel.stop()
+        if terminal:
+            terminal()
+    conn = init_db()
+    try:
+        session = get_session(conn, session_id)
+    finally:
+        conn.close()
+    if not session or not session.get("run_receipt"):
+        raise SystemExit(f"Run failed (outcome: {session and session.get('outcome')})")
+    return RunReceipt.model_validate(session["run_receipt"])
 
 
 def main() -> None:
-    raw_text = " ".join(sys.argv[1:]).strip()
-    if not raw_text:
-        raise SystemExit("Usage: python -m core.gateway.cli <goal>")
-    receipt = asyncio.run(handle_cli_input(raw_text))
+    parser = argparse.ArgumentParser(description="Run one goal through the Harness Engine")
+    parser.add_argument("goal", nargs="+")
+    parser.add_argument("--agent", default=DEFAULT_AGENT)
+    parser.add_argument("--verify-file", nargs=2, metavar=("PATH", "EXPECTED"),
+                        help="verify that PATH contains EXPECTED after the run")
+    args = parser.parse_args()
+    verification = ({"type": "file_content", "path": args.verify_file[0], "expected_content": args.verify_file[1]}
+                    if args.verify_file else None)
+    receipt = asyncio.run(handle_cli_input(" ".join(args.goal), verification, args.agent))
     print(receipt.model_dump_json(indent=2))
 
 
