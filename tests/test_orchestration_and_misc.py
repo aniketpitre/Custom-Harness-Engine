@@ -346,7 +346,7 @@ class TestReceiptsAndRegistry:
 
         from core.registry import load_agents
 
-        agents = load_agents(Path(__file__).parent.parent / "config" / "agents.yaml")
+        agents = load_agents(Path(__file__).parent.parent / "core" / "defaults" / "agents.yaml")
         assert "DevOpsWrite" in agents["devops_agent"].allowed_tools and "DevOpsWrite" not in agents["read_only_explorer"].allowed_tools
         from core.policy import parse_rule
 

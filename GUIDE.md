@@ -2,8 +2,10 @@
 
 ## 1. Configure
 
-Everything is configured with environment variables (`HARNESS_*`), optionally `config/settings.yaml`
-(`model.primary`, `model.fallback`, `otel.endpoint`). Secrets come from the environment first, then Vault.
+`harness init` writes `~/.harness/.env` (mode 600) and `~/.harness/config/agents.yaml`. Everything is configured
+with environment variables (`HARNESS_*`), optionally `~/.harness/config/settings.yaml` (`model.primary`,
+`model.fallback`, `otel.endpoint`). Precedence: real environment → `.env` → settings.yaml → packaged defaults.
+Secrets come from the environment/`.env` first, then Vault (optional). Run `harness doctor` after any change.
 
 | Variable | Purpose | Default |
 |---|---|---|
@@ -20,7 +22,7 @@ Everything is configured with environment variables (`HARNESS_*`), optionally `c
 | `HARNESS_RECEIPT_KEY` | HMAC key for the event-log hash chain | unset (plain SHA-256) |
 | `HARNESS_WEBHOOK_ENDPOINTS`, `HARNESS_WEBHOOK_SECRET` | Signed completion webhooks | none |
 
-## 2. Agents (`config/agents.yaml`)
+## 2. Agents (`~/.harness/config/agents.yaml`)
 
 ```yaml
 - id: sre
@@ -50,8 +52,8 @@ Approvals arrive on Telegram (buttons: approve once / approve for session / deny
 
 ## 4. Extend it
 
-- **MCP servers:** copy `config/mcp.yaml.example` to `config/mcp.yaml`. Tools become `mcp__<server>__<tool>`.
-- **Hooks:** `config/hooks.yaml.example`. A `pre_tool` hook may deny/ask or rewrite arguments (exit code 2 blocks);
+- **MCP servers:** copy `core/defaults/mcp.yaml.example` (in a checkout) to `~/.harness/config/mcp.yaml`. Tools become `mcp__<server>__<tool>`.
+- **Hooks:** `~/.harness/config/hooks.yaml` (see `core/defaults/hooks.yaml.example`). A `pre_tool` hook may deny/ask or rewrite arguments (exit code 2 blocks);
   a `stop` hook can force the agent to continue (this is how you enforce a verification step).
 - **Plugins:** subclass `core.plugins.base.Plugin`, register tools/hooks/services in `register(ctx)`, load with
   `engine.plugins.load(...)`. Reload and unload are transactional.

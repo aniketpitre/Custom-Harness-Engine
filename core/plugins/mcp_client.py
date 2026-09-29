@@ -110,7 +110,7 @@ class McpServerPlugin(Plugin):
 
 
 def mcp_plugins(path: str | None = None) -> list[Plugin]:
-    from core.settings import find_config
+    from core.home import find_config
 
     path = path or str(find_config("mcp.yaml"))
     if not os.path.isfile(path):

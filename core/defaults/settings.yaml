@@ -1,0 +1,7 @@
+# Packaged defaults. Override per install in $HARNESS_HOME/config/settings.yaml
+# (environment variables always win).
+model:
+  primary: groq/openai/gpt-oss-120b
+  # fallback: groq/compound
+# otel:
+#   endpoint: http://localhost:4317

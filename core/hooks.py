@@ -107,7 +107,7 @@ def command_hook(command: str, timeout: float = HOOK_BUDGET_SECONDS) -> Callable
 
 def load_hook_config(bus: HookBus, path: str | None = None) -> list[Disposer]:
     """config/hooks.yaml: `- event: pre_tool` / `command: ./check.sh` / `priority: 50`."""
-    from core.settings import find_config
+    from core.home import find_config
 
     path = path or str(find_config("hooks.yaml"))
     if not os.path.isfile(path):

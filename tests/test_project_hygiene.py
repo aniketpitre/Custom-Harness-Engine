@@ -59,7 +59,7 @@ def test_vault_init_creates_a_read_only_policy_token():
 
 def test_dockerfile_runs_the_api_as_non_root_with_all_packages():
     text = (ROOT / "Dockerfile").read_text()
-    assert "USER harness" in text and 'CMD ["python", "main.py"]' in text and "COPY cli" in text
+    assert "USER harness" in text and 'CMD ["harness", "serve"]' in text and "COPY cli" in text
     assert "HEALTHCHECK" in text
 
 

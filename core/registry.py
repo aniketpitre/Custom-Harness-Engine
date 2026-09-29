@@ -6,9 +6,11 @@ from core.plugins.base import LifecycleState  # noqa: E402,F401
 from core.primitives.agent import AgentProfile
 
 
-def load_agents(path: Path | str = "config/agents.yaml") -> Dict[str, AgentProfile]:
+def load_agents(path: Path | str | None = None) -> Dict[str, AgentProfile]:
     """Load declarative agent configurations from a YAML file."""
-    filepath = Path(path)
+    from core.home import find_config
+
+    filepath = Path(path) if path else find_config("agents.yaml")
     if not filepath.exists():
         return {}
 
@@ -22,7 +24,7 @@ def load_agents(path: Path | str = "config/agents.yaml") -> Dict[str, AgentProfi
 class AgentRegistry:
     """Registry object for managing agent profiles and their lifecycles."""
     def __init__(self, config_path: Path | str | None = None):
-        from core.settings import find_config
+        from core.home import find_config
 
         self.config_path = Path(config_path or os.getenv("HARNESS_AGENTS_FILE") or find_config("agents.yaml")).resolve()
         self._agents = load_agents(self.config_path)

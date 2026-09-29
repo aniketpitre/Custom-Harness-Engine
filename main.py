@@ -1,5 +1,9 @@
 import uvicorn
 
+from core.home import load_env
+
+load_env()
+
 from core.gateway.api import app, registry
 from core.settings import settings
 

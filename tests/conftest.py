@@ -5,19 +5,21 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+os.environ["HARNESS_HOME"] = "/nonexistent-harness-home"  # never read a real ~/.harness while collecting
 
-_ENV_KEYS = [k for k in os.environ if k.startswith(("HARNESS_", "VAULT_"))]
 
 
 @pytest.fixture(autouse=True)
 def isolated_env(tmp_path, monkeypatch):
     """Every test gets its own DB, data dir and workspace; no Vault, no real tokens."""
-    for key in _ENV_KEYS:
+    saved = dict(os.environ)                       # code under test (e.g. `harness init`) may set os.environ
+    for key in [k for k in os.environ if k.startswith(("HARNESS_", "VAULT_"))]:
         monkeypatch.delenv(key, raising=False)
     for key in ("GROQ_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OTEL_EXPORTER_OTLP_ENDPOINT"):
         monkeypatch.delenv(key, raising=False)
     workspace = tmp_path / "workspace"
     workspace.mkdir()
+    monkeypatch.setenv("HARNESS_HOME", str(tmp_path / "home"))
     monkeypatch.setenv("HARNESS_DB_PATH", str(tmp_path / "data" / "memory.db"))
     monkeypatch.setenv("HARNESS_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("HARNESS_WORKSPACE", str(workspace))
@@ -34,6 +36,8 @@ def isolated_env(tmp_path, monkeypatch):
     set_broker(ApprovalBroker(timeout=2))
     yield workspace
     set_broker(None)
+    os.environ.clear()
+    os.environ.update(saved)
 
 
 @pytest.fixture

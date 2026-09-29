@@ -11,7 +11,6 @@ COPY core ./core
 COPY domains ./domains
 COPY receipts ./receipts
 COPY cli ./cli
-COPY config ./config
 COPY main.py ./main.py
 RUN pip install --no-cache-dir ".[runtime]" && mkdir -p /app/data /workspace && chown -R harness /app/data /workspace
 
@@ -21,5 +20,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
 
-# Serves the control-plane API. One-shot CLI: docker compose run harness python -m core.gateway.cli "<goal>"
-CMD ["python", "main.py"]
+# Serves the control-plane API. One-shot: docker compose run --rm harness harness run "<goal>"
+CMD ["harness", "serve"]

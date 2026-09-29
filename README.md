@@ -344,9 +344,9 @@ await engine.plugins.load(MyPlugin())            # transactional; same name = re
 - **Tools are data:** `ToolSpec` declares capability, argument-aware risk, `read_only`/`parallel_safe`,
   output limit, untrusted flag, snapshot pair, post-condition, timeout, and an approval rendering.
 - **Hooks:** `session_start`, `before_turn`, `pre_tool` (deny / ask / rewrite arguments), `post_tool`,
-  `pre_compact`, `post_compact`, `stop` (force continuation), `session_end`. Shell hooks via `config/hooks.yaml`
+  `pre_compact`, `post_compact`, `stop` (force continuation), `session_end`. Shell hooks via `~/.harness/config/hooks.yaml`
   (JSON on stdin, exit code 2 blocks). Each hook has a time budget; a failing hook is skipped.
-- **MCP:** `config/mcp.yaml` starts servers over stdio; tools become `mcp__<server>__<tool>`, are untrusted, R2 by
+- **MCP:** `~/.harness/config/mcp.yaml` starts servers over stdio; tools become `mcp__<server>__<tool>`, are untrusted, R2 by
   default, and R0 for names in `read_only_tools`. A server that fails to start is a `FAILED` plugin, not a crash.
 - **Subagents:** `spawn_agent` (or `SubagentSpec` in a workflow) runs a child session that can have at most the
   parent's capabilities, shares its token budget, and is bounded by depth, concurrency and time.
@@ -388,28 +388,50 @@ above are more mature for that.
 
 ## Quick start
 
+**One command** (installs the `harness` command in an isolated environment via `uv`, `pipx` or a private venv;
+needs Python 3.11+ or `uv`):
+
 ```bash
-pip install -e ".[dev]"                 # core only: pip install -e .   integrations: ".[runtime]"
-export HARNESS_API_TOKEN=$(openssl rand -hex 32)      # required - the API fails closed without it
-export GROQ_API_KEY=...                 # any LiteLLM provider key (or store it in Vault)
-python main.py                          # API on 127.0.0.1:8000
-
-# create and run a session, then stream it
-curl -s -H "Authorization: Bearer $HARNESS_API_TOKEN" -X POST localhost:8000/sessions \
-     -d '{"agent_id":"devops_agent","goal":"List the files in the workspace","run":true}'
-curl -N -H "Authorization: Bearer $HARNESS_API_TOKEN" localhost:8000/sessions/<id>/stream
-
-# one-shot CLI (prints the receipt as JSON)
-python -m core.gateway.cli "List the files in the workspace"
+curl -fsSL https://raw.githubusercontent.com/aniketpitre/Custom-Harness-Engine/main/install.sh | sh
+harness init        # ~1 minute: provider, model, API key, generates the API token, optional Telegram
+harness doctor      # checks the install and prints the exact fix for anything missing
+harness serve       # API on 127.0.0.1:8000
+harness run "List the files in the workspace"
 ```
 
-Requires Python 3.11+. Optional extras: `telegram`, `vault`, `devops` (kubernetes, GitPython), `mcp`, `otel`, `setup`.
+Alternatives: `pipx install "harness-engine[runtime] @ git+https://github.com/aniketpitre/Custom-Harness-Engine.git"`,
+`uvx --from git+https://github.com/aniketpitre/Custom-Harness-Engine.git harness doctor`, or Docker (below).
+The installer accepts `HARNESS_SOURCE` (PyPI name, wheel, git URL or local path) and `HARNESS_EXTRAS`.
+
+`harness init` writes everything to `~/.harness` (override with `HARNESS_HOME`): a mode-600 `.env` (provider key,
+API token, optional Telegram), `config/agents.yaml` (yours to edit) and `data/` (database, checkpoints, skills).
+No Vault, Docker or database server is required; Vault is an optional secrets provider.
+
+| Command | Purpose |
+|---|---|
+| `harness init` | First-run setup; idempotent (keeps your token and edited agents). `-y` with flags for scripts/CI: `--provider --model --api-key-env VAR --telegram-bot-token-env VAR ...` |
+| `harness doctor [--online] [--json]` | Checks Python, permissions (`.env` must be 600), token, model key, agents, database, `git`/`gh`/`kubectl`/`argocd`/`bwrap`, optional Python extras, port; `--online` makes a tiny model call. Exit code 1 on failures |
+| `harness serve [--host --port]` | Start the API (refuses to start without a token; warns on non-loopback binds) |
+| `harness run GOAL [--agent] [--verify-file PATH TEXT]` | One-shot run; prints the receipt JSON; exit code reflects success |
+| `harness token` | Print the API token (for `curl`) |
+| `harness sessions [ID]` | Recent sessions / one session |
+| `harness approvals list|approve|deny ID` | Manage approvals on a running server |
+| `harness plugins` | Plugin states and tools |
+
+```bash
+curl -s -H "Authorization: Bearer $(harness token)" -X POST localhost:8000/sessions \
+     -d '{"agent_id":"devops_agent","goal":"List the files in the workspace","run":true}'
+```
+
+Development checkout: `pip install -e ".[dev]"`. Optional extras: `telegram`, `vault`, `devops` (kubernetes, GitPython),
+`mcp`, `otel`, `setup`, `runtime` (all integrations).
 
 ---
 
 ## Configuration
 
-Environment variables (highest priority), then `config/settings.yaml`, then defaults.
+Precedence: real environment variables → `$HARNESS_HOME/.env` → `$HARNESS_HOME/config/settings.yaml` → packaged defaults.
+Config files are looked up in `$HARNESS_HOME/config/`, then `./config/` (checkouts), then the defaults shipped in the wheel (`core/defaults/`).
 
 | Variable | Purpose | Default |
 |---|---|---|
@@ -428,10 +450,11 @@ Environment variables (highest priority), then `config/settings.yaml`, then defa
 | `HARNESS_RECEIPT_KEY` | HMAC key for the event-log chain | unset |
 | `HARNESS_WEBHOOK_ENDPOINTS`, `HARNESS_WEBHOOK_SECRET` | Signed completion webhooks | none |
 | `HARNESS_MEMORY_LIMIT_CHARS`, `HARNESS_MEMORY_FLUSH` | Curated memory size, flush before compaction | `2200` / `true` |
-| `HARNESS_DB_PATH`, `HARNESS_DATA_DIR` | SQLite location, data directory | `data/memory.db`, `data/` |
+| `HARNESS_HOME` | Home for `.env`, config and data | `~/.harness` |
+| `HARNESS_DB_PATH`, `HARNESS_DATA_DIR` | SQLite location, data directory | `$HARNESS_HOME/data/memory.db`, `$HARNESS_HOME/data/` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Enable tracing | unset |
 
-Agents are declared in `config/agents.yaml`:
+Agents are declared in `~/.harness/config/agents.yaml` (created by `harness init`):
 
 ```yaml
 - id: sre
@@ -490,7 +513,7 @@ harness, and runs the API on `127.0.0.1:8000` as a non-root user with a separate
 ## Testing
 
 ```bash
-pytest                      # 351 unit + integration tests: no network, no external services
+pytest                      # 380+ unit + integration tests: no network, no external services
 pytest -m live tests/live   # real Vault / cluster / ArgoCD / GitHub (skipped by default)
 ruff check .
 ```
@@ -515,7 +538,9 @@ core/memory/          sqlite store, curator, dreamer
 core/primitives/      pydantic models: Goal, ContextPacket, Evidence, Policy, ActionRecord, RunReceipt, ...
 domains/generic/      fs, web, shell
 domains/devops/       kubectl, ArgoCD, GitOps (worktree), snapshots, risk table, skills
-config/               agents.yaml, settings.yaml, *.example (mcp, hooks)
+core/defaults/        packaged defaults: agents.yaml, settings.yaml, *.example (mcp, hooks)
+cli/                  the `harness` command (init, serve, run, doctor, ...)
+install.sh            one-command installer (uv / pipx / private venv)
 docs/                 design docs, audit, IMPLEMENTATION_STATUS.md, references
 tests/                unit, integration and live tests
 ```

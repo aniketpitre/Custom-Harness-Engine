@@ -1,4 +1,4 @@
-"""One settings object: environment > config/settings.yaml > defaults.
+"""One settings object: environment > $HARNESS_HOME/config/settings.yaml > packaged defaults.
 
 `settings()` is cheap and re-reads the environment on every call, so tests and
 operators can change behaviour without restarting the process.
@@ -40,11 +40,9 @@ def _bool(name: str, default: bool) -> bool:
 
 
 def find_config(name: str) -> Path:
-    """config/<name> in the working directory, else next to the installed sources."""
-    local = Path("config") / name
-    if local.exists():
-        return local
-    return Path(__file__).resolve().parent.parent / "config" / name
+    from core.home import find_config as _find
+
+    return _find(name)
 
 
 def _file_config() -> dict:
@@ -138,7 +136,9 @@ def settings() -> Settings:
     cfg = _file_config()
     model_cfg = cfg.get("model") or {}
     otel_cfg = cfg.get("otel") or {}
-    db_path = Path(os.getenv("HARNESS_DB_PATH", "data/memory.db"))
+    from core.home import harness_home
+
+    db_path = Path(os.getenv("HARNESS_DB_PATH") or harness_home() / "data" / "memory.db")
     data_dir = Path(os.getenv("HARNESS_DATA_DIR", str(db_path.parent)))
     fallback = _csv("HARNESS_FALLBACK_MODELS") or tuple(
         m for m in [model_cfg.get("fallback")] if m

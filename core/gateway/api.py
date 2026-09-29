@@ -26,6 +26,7 @@ from core.background.scheduler import (
     start_scheduler,
 )
 from core.engine import get_engine
+from core.home import load_env
 from core.memory.dreamer import run_memory_consolidation
 from core.memory.store import create_session, get_session, init_db, update_session
 from core.registry import AgentRegistry
@@ -34,6 +35,7 @@ from core.secrets import get_secret
 from core.settings import settings
 from core.skills import discover_skills
 
+load_env()  # $HARNESS_HOME/.env written by `harness init` (real env vars win)
 security = HTTPBearer(auto_error=False)
 registry = AgentRegistry()
 engine = get_engine()

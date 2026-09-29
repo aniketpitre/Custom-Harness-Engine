@@ -4,8 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "harness-engine"
-version = "0.2.0"
+dynamic = ["version"]
 requires-python = ">=3.11"
+description = "Policy-gated agent runtime that turns goals into verified, audited outcomes"
+readme = "README.md"
 # Core runtime only. Domain packs and integrations are optional extras and import lazily.
 dependencies = [
     "pydantic>=2.6",
@@ -20,6 +22,9 @@ dependencies = [
     "opentelemetry-sdk",
 ]
 
+[project.scripts]
+harness = "cli.main:main"
+
 [project.optional-dependencies]
 telegram = ["python-telegram-bot>=21.0"]
 vault = ["hvac"]
@@ -30,11 +35,15 @@ setup = ["questionary"]
 runtime = ["harness-engine[telegram,vault,devops,mcp,otel]"]
 dev = ["pytest", "pytest-asyncio", "ruff", "harness-engine[runtime,setup]"]
 
+[tool.setuptools.dynamic]
+version = {attr = "core.__version__"}
+
 [tool.setuptools.packages.find]
 include = ["core*", "domains*", "receipts*", "cli*"]
 
 [tool.setuptools.package-data]
 "domains.devops" = ["skills/*/SKILL.md"]
+"core" = ["defaults/*"]
 
 [tool.ruff]
 line-length = 120

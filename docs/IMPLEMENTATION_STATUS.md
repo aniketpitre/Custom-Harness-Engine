@@ -51,6 +51,18 @@ C7 persistent cron, heartbeat, list/pause/delete - done. C8 `AGENTS.md` - done.
 | D5 | Taint tracking | Done |
 | D6 | "Code" mode (scripting against a typed SDK) | **Deliberately not built** (bloat; see audit "what not to build") |
 
+## Installation UX
+
+| Item | Status |
+|---|---|
+| `harness` command (`init`, `serve`, `run`, `doctor`, `token`, `sessions`, `approvals`, `plugins`, `version`) | Done (`cli/main.py`) |
+| Defaults packaged in the wheel; per-user config in `~/.harness` (`HARNESS_HOME`) | Done (`core/home.py`, `core/defaults/`); the old `config/` directory moved |
+| No Vault/Docker needed: mode-600 `.env` written by `harness init`, Vault optional | Done |
+| `harness doctor` with per-check fixes and exit codes | Done (`cli/doctor.py`) |
+| One-line installer (`install.sh`: uv → pipx → private venv; git/PyPI/wheel/path sources) | Done; tested with dry runs and a real clean-venv install |
+| Wheel built, installed into an empty directory and run from another cwd | Covered by `tests/test_install_and_cli.py::TestWheel` |
+| Publish to PyPI / GHCR on tag | **Not done** (next step); until then install from the git URL |
+
 ## Known limits
 
 - The shell/dynamic-tool sandbox is only as strong as the backend: without `bwrap`/docker the process has the
