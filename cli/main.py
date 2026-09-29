@@ -10,8 +10,8 @@ import secrets as pysecrets
 import shutil
 import sys
 
-from core import __version__
-from core.home import DEFAULTS_DIR, ensure_home, env_file, harness_home, load_env, write_env
+from core import __version__, theme
+from core.home import DEFAULTS_DIR, ensure_home, env_file, harness_home, keyring_items, load_env, write_env
 
 PROVIDERS = {
     "groq": ("GROQ_API_KEY", "groq/openai/gpt-oss-120b"),
@@ -32,6 +32,7 @@ def _ask(prompt: str, default: str = "", secret: bool = False) -> str:
 # ---------------------------------------------------------------------------
 def cmd_init(args) -> int:
     load_env()
+    print(theme.banner(__version__), end="")
     home = ensure_home()
     interactive = not args.yes and sys.stdin.isatty()
     provider = (args.provider or (_ask("LLM provider (" + "/".join(PROVIDERS) + ")", "groq") if interactive else "groq")).lower()
@@ -92,7 +93,7 @@ def cmd_init(args) -> int:
     from cli.doctor import collect, render
 
     print("\n" + render(collect()))
-    print("\nNext: `harness serve`   then   `harness run \"List the files in the workspace\"`")
+    print(f"\n{theme.glyph('run')} Next: `harness serve`   then   `harness run \"List the files in the workspace\"`".lstrip())
     return 0
 
 
@@ -153,6 +154,7 @@ def cmd_serve(args) -> int:
         print(f"warning: binding to {host}; make sure the API is not reachable by untrusted networks.", file=sys.stderr)
     import uvicorn
 
+    print(theme.banner(__version__, sys.stderr), end="", file=sys.stderr)
     uvicorn.run("core.gateway.api:app", host=host, port=port, log_level=args.log_level)
     return 0
 
@@ -166,6 +168,10 @@ def cmd_run(args) -> int:
                     if args.verify_file else None)
     receipt = asyncio.run(handle_cli_input(" ".join(args.goal), verification, args.agent))
     print(receipt.model_dump_json(indent=2))
+    if theme.styled(sys.stderr):
+        ok = receipt.status == "success"
+        print(f"\n{theme.glyph('receipt', sys.stderr)} {theme.status_mark('ok' if ok else 'fail', sys.stderr)} "
+              f"{theme.paint(str(receipt.status), 'accent', sys.stderr)}", file=sys.stderr)
     return 0 if receipt.status == "success" else 1
 
 
@@ -228,7 +234,7 @@ def cmd_approvals(args) -> int:
     data = resp.json()
     if args.action == "list":
         for a in data:
-            print(f"{a['id']}  {a['risk_tier']}  {a['tool']}\n    {a['rendered'][:300].replace(chr(10), chr(10) + '    ')}")
+            print(f"{a['id']}  {theme.risk_mark(a['risk_tier'])} {a['risk_tier']}  {a['tool']}\n    {a['rendered'][:300].replace(chr(10), chr(10) + '    ')}")
         if not data:
             print("no pending approvals")
     else:
@@ -244,14 +250,41 @@ def cmd_plugins(args) -> int:
         engine = Engine()
         await engine.ensure_started()
         for p in engine.plugins.status():
-            print(f"{p['name']:<12} {p['state']:<8} {', '.join(p['tools'])[:80]}" + (f"  ERROR: {p['error']}" if p["error"] else ""))
+            mark = theme.status_mark("fail" if p["error"] else "ok") if theme.styled() else ""
+            print(f"{mark + ' ' if mark else ''}{p['name']:<12} {p['state']:<8} {', '.join(p['tools'])[:80]}"
+                  + (f"  ERROR: {p['error']}" if p["error"] else ""))
         await engine.shutdown()
 
     asyncio.run(go())
     return 0
 
 
+def cmd_theme(args) -> int:
+    load_env()
+    skins = theme.available()
+    name = theme.current_name()
+    if args.action == "list":
+        for key, skin in skins.items():
+            mark = "*" if key == name else " "
+            print(f"{mark} {theme.preview(skin) if theme.styled() else f'{key:<9} {skin.description}'}")
+        print(f"\nActive: {name}. Change it with `harness theme set NAME`; add your own in {theme.skins_dir()}/NAME.yaml")
+        return 0
+    if args.action == "show":
+        print(theme.banner(__version__), end="")
+        print(f"theme: {theme.current().name} ({theme.current().description})")
+        return 0
+    if not args.name or args.name not in skins:
+        print(f"Unknown theme {args.name!r}. Available: {', '.join(skins)}", file=sys.stderr)
+        return 2
+    write_env({"HARNESS_THEME": args.name}, store="keyring" if keyring_items() else "file")
+    os.environ["HARNESS_THEME"] = args.name
+    print(theme.banner(__version__), end="")
+    print(f"Theme set to {args.name}.")
+    return 0
+
+
 def cmd_version(args) -> int:
+    print(theme.banner(__version__), end="")
     print(f"harness-engine {__version__}  (home: {harness_home()})")
     return 0
 
@@ -259,7 +292,7 @@ def cmd_version(args) -> int:
 # ---------------------------------------------------------------------------
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="harness", description="Harness Engine: verified, audited agent runtime")
-    sub = p.add_subparsers(dest="command", required=True)
+    sub = p.add_subparsers(dest="command")
 
     i = sub.add_parser("init", help="first-run setup (model, key, API token, approvals)")
     i.add_argument("--provider", choices=list(PROVIDERS))
@@ -315,13 +348,24 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--url")
     a.set_defaults(fn=cmd_approvals)
 
+    th = sub.add_parser("theme", help="list, show or set the terminal theme (helm, harbor, ember, forest, midnight, mono)")
+    th.add_argument("action", choices=["list", "show", "set"], nargs="?", default="list")
+    th.add_argument("name", nargs="?")
+    th.set_defaults(fn=cmd_theme)
+
     sub.add_parser("plugins", help="list plugins and their state").set_defaults(fn=cmd_plugins)
     sub.add_parser("version").set_defaults(fn=cmd_version)
     return p
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if not args.command:
+        load_env()
+        print(theme.banner(__version__), end="")
+        parser.print_help()
+        return 0
     if args.command == "approvals" and args.action != "list" and not args.approval_id:
         print("approval id required", file=sys.stderr)
         return 2

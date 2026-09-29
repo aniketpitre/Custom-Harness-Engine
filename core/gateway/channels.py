@@ -55,10 +55,16 @@ def terminal_channel(broker: ApprovalBroker, force: bool = False):
             async with lock:
                 if not _pending(broker, req.id):        # answered elsewhere while queued
                     return
-                print(f"\n[approval needed: {req.risk_tier}] {req.tool}\n{req.rendered}\n"
-                      f"(you can also answer via the API or Telegram)", file=sys.stderr, flush=True)
+                from core import theme
+
+                err = sys.stderr
+                head = (f"{theme.glyph('approve', err)} approval needed  {theme.risk_mark(req.risk_tier, err)} "
+                        f"{req.risk_tier}  {req.tool}").replace("  ", " ")
+                print(f"\n{theme.paint(head, 'warn', err)}\n{req.rendered}\n"
+                      f"{theme.paint('(you can also answer via the API or Telegram)', 'dim', err)}",
+                      file=err, flush=True)
                 try:
-                    answer = await asyncio.to_thread(input, "Approve? [y]es / [s]ession / [N]o: ")
+                    answer = await asyncio.to_thread(input, theme.current().prompt)
                 except EOFError:
                     return
                 if not _pending(broker, req.id):

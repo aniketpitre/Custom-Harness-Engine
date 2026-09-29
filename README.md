@@ -415,6 +415,7 @@ No Vault, Docker or database server is required; Vault is an optional secrets pr
 | `harness serve [--host --port]` | Start the API (refuses to start without a token; warns on non-loopback binds) |
 | `harness run GOAL [--agent] [--verify-file PATH TEXT]` | One-shot run; prints the receipt JSON; exit code reflects success |
 | `harness token` | Print the API token (for `curl`) |
+| `harness theme list\|show\|set NAME` | Terminal theme: `helm` (default), `harbor`, `ember`, `forest`, `midnight`, `mono`, or your own `~/.harness/skins/NAME.yaml` |
 | `harness secret list\|set NAME\|delete NAME` | Manage secrets in the OS keyring (macOS Keychain, Windows Credential Locker, Secret Service/KWallet); values are never printed |
 | `harness sessions [ID]` | Recent sessions / one session |
 | `harness approvals list|approve|deny ID` | Manage approvals on a running server |
@@ -504,6 +505,23 @@ Stream event types: `message_delta`, `message`, `tool_call`, `tool_result`, `int
 
 ---
 
+### Terminal theme
+
+The CLI has a DevOps look: a ship's-wheel mascot, themed status marks (✅ ⚠️ ❌), risk markers on approvals
+(🟢 R0, 🟡 R1, 🟠 R2, 🔴 R3, ⛔ R4), live tool progress on stderr during `harness run`, and DevOps spinner verbs. Pick
+a skin with `harness theme set ember` (on-call orange) or write your own YAML that extends one:
+
+```yaml
+# ~/.harness/skins/acme.yaml
+extends: harbor
+tagline: acme platform team
+colors: {brand: magenta}
+glyphs: {mascot: "🐝"}
+```
+
+Styling shows only on an interactive terminal; piped output, `--json` and receipts stay plain. `NO_COLOR`,
+`HARNESS_ASCII=1` (no emoji) and `HARNESS_PLAIN=1` are honoured.
+
 ## Docker
 
 `./start.sh` (or `docker compose up --build`) starts a dev Vault, seeds it, mints a **read-only** token for the
@@ -567,6 +585,10 @@ tests/                unit, integration and live tests
 - The old Vault token that once lived in a test file is still in git history and must be rotated and purged.
 
 ## Documentation
+
+- [`docs/ROADMAP.md`](docs/ROADMAP.md): what is left compared with other agents, with sources and a prioritised plan
+- [`docs/OWASP_AGENTIC_MAPPING.md`](docs/OWASP_AGENTIC_MAPPING.md): security controls mapped to the OWASP agentic risks
+
 
 - [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) - every audit finding and how it was addressed
 - [`docs/Harness_Engine_Audit.md`](docs/Harness_Engine_Audit.md) - the full audit and comparison research

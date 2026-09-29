@@ -61,7 +61,11 @@ C7 persistent cron, heartbeat, list/pause/delete - done. C8 `AGENTS.md` - done.
 | `harness doctor` with per-check fixes and exit codes | Done (`cli/doctor.py`) |
 | One-line installer (`install.sh`: uv → pipx → private venv; git/PyPI/wheel/path sources) | Done; tested with dry runs and a real clean-venv install |
 | Wheel built, installed into an empty directory and run from another cwd | Covered by `tests/test_install_and_cli.py::TestWheel` |
-| Publish to PyPI / GHCR on tag | **Not done** (next step); until then install from the git URL |
+| Publish to PyPI / GHCR on tag | Workflow written and validated (`.github/workflows/release.yml`); first real release needs the one-time PyPI trusted-publisher setup, until then install from the git URL |
+| DevOps terminal theme: mascot, six skins, user YAML skins, themed doctor/approvals/live tool status; plain when piped | Done (`core/theme.py`, `harness theme`, `tests/test_theme.py`) |
+
+What is left, compared with other agents and current industry practice, is in `docs/ROADMAP.md` (phases E1 to E4).
+Control-by-control security mapping: `docs/OWASP_AGENTIC_MAPPING.md`.
 
 ## Known limits
 

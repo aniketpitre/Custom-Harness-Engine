@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import sys
 import uuid
 
+from core import theme
 from core.engine import get_engine
 from core.gateway.channels import start_telegram, terminal_channel
 from core.memory.store import create_session, get_session, init_db
@@ -13,6 +15,22 @@ from core.registry import AgentRegistry
 from core.runs import RunManager
 
 DEFAULT_AGENT = "devops_agent"
+
+
+def _live_status(engine):
+    """Themed progress on stderr while a goal runs: which tool is working and how it ended."""
+    err = sys.stderr
+
+    def started(event: dict) -> None:
+        print(f"{theme.glyph('tool', err)} {theme.paint(event['tool'], 'brand', err)} "
+              f"{theme.paint(theme.verb() + '...', 'dim', err)}", file=err, flush=True)
+
+    def finished(event: dict) -> None:
+        mark = theme.status_mark("fail" if event.get("is_error") else "ok", err)
+        print(f"  {mark} {event['tool']}", file=err, flush=True)
+
+    disposers = [engine.hooks.on("pre_tool", started, priority=999), engine.hooks.on("post_tool", finished, priority=999)]
+    return lambda: [d() for d in disposers]
 
 
 async def handle_cli_input(
@@ -37,6 +55,7 @@ async def handle_cli_input(
         conn.close()
     channel = start_telegram(engine.broker)
     terminal = terminal_channel(engine.broker)
+    live = _live_status(engine) if theme.styled(sys.stderr) else None
     try:
         await runs.run_inline(session_id)
     finally:
@@ -44,6 +63,8 @@ async def handle_cli_input(
             await channel.stop()
         if terminal:
             terminal()
+        if live:
+            live()
     conn = init_db()
     try:
         session = get_session(conn, session_id)

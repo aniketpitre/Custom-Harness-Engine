@@ -158,12 +158,13 @@ def collect(online: bool = False, port: int | None = None) -> list[Check]:
 
 
 def render(checks: list[Check]) -> str:
-    icon = {OK: "✓", WARN: "!", FAIL: "✗"}
+    from core import theme
+
     lines = []
     for c in checks:
-        lines.append(f" {icon[c.status]} {c.name:<18} {c.detail}")
+        lines.append(f" {theme.status_mark(c.status)} {c.name:<18} {c.detail}")
         if c.fix and c.status != OK:
-            lines.append(f"     → {c.fix}")
+            lines.append(f"     {theme.glyph('arrow')} {c.fix}")
     fails = sum(c.status == FAIL for c in checks)
     warns = sum(c.status == WARN for c in checks)
     lines.append(f"\n{fails} problem(s), {warns} warning(s)." + ("" if fails else " Ready to go: `harness serve`."))
