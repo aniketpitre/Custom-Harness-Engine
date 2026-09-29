@@ -2,10 +2,11 @@
 # One-command installer for Harness Engine.
 #   curl -fsSL https://raw.githubusercontent.com/aniketpitre/Custom-Harness-Engine/main/install.sh | sh
 # Installs the `harness` command in an isolated environment (uv, else pipx, else a private venv).
-# Override the source with HARNESS_SOURCE (a PyPI name, wheel, or git URL). HARNESS_EXTRAS picks extras.
+# Override the source with HARNESS_SOURCE (a PyPI name, wheel, archive/git URL, or local path). HARNESS_EXTRAS picks extras.
 set -eu
 
-SOURCE="${HARNESS_SOURCE:-git+https://github.com/aniketpitre/Custom-Harness-Engine.git}"
+# Default: the GitHub source archive (no git needed). Until a PyPI release exists this is the way to install.
+SOURCE="${HARNESS_SOURCE:-https://github.com/aniketpitre/Custom-Harness-Engine/archive/refs/heads/main.tar.gz}"
 EXTRAS="${HARNESS_EXTRAS-runtime}"
 if [ -n "$EXTRAS" ]; then BRACKET="[$EXTRAS]"; else BRACKET=""; fi
 case "$SOURCE" in

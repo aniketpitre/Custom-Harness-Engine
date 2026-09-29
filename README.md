@@ -401,7 +401,8 @@ harness run "List the files in the workspace"
 
 Alternatives: `pipx install "harness-engine[runtime] @ git+https://github.com/aniketpitre/Custom-Harness-Engine.git"`,
 `uvx --from git+https://github.com/aniketpitre/Custom-Harness-Engine.git harness doctor`, or Docker (below).
-The installer accepts `HARNESS_SOURCE` (PyPI name, wheel, git URL or local path) and `HARNESS_EXTRAS`.
+The installer needs no `git` (it installs the GitHub source archive) and accepts `HARNESS_SOURCE` (PyPI name, wheel,
+archive/git URL or local path) and `HARNESS_EXTRAS`.
 
 `harness init` writes everything to `~/.harness` (override with `HARNESS_HOME`): a mode-600 `.env` (provider key,
 API token, optional Telegram), `config/agents.yaml` (yours to edit) and `data/` (database, checkpoints, skills).

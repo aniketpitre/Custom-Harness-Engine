@@ -381,7 +381,7 @@ class TestInstallScript:
 
     def test_prefers_uv_then_pipx_then_private_venv(self, tmp_path):
         out = self._run(tmp_path, ["uv", "pipx", "python3"]).stdout
-        assert out.startswith("uv tool install --force") and "harness-engine[runtime] @ git+https://github.com/aniketpitre/" in out
+        assert out.startswith("uv tool install --force") and "harness-engine[runtime] @ https://github.com/aniketpitre/Custom-Harness-Engine/archive/refs/heads/main.tar.gz" in out
         assert self._run(tmp_path / "b", ["pipx", "python3"]).stdout.startswith("pipx install --force")
         venv = self._run(tmp_path / "c", ["python3"], {"HARNESS_VENV": str(tmp_path / "v")}).stdout
         assert "-m venv" in venv and 'pip" install "harness-engine[runtime] @' in venv and ".local/bin/harness" in venv
