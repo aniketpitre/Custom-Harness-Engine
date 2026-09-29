@@ -43,8 +43,8 @@ inherit any key they omit, like Hermes skins. Styling appears only on an interac
 |---|---|---|---|
 | E1.1 | **Done.** Cost accounting: per-call, per-session and per-agent USD from LiteLLM's price map, a `max_cost_usd` budget, `harness sessions` shows cost, cost in receipts | Every reference agent shows cost; teams need a spend ceiling | S |
 | E1.2 | `harness chat`: interactive REPL on the existing engine (streaming, `/rewind`, `/cost`, `/theme`, `/approve`), themed status line | Biggest usability gap versus Claude Code, Hermes and OpenClaw | M |
-| E1.3 | **Done.** Permission modes (`core/modes.py`; `accept-edits` dropped because workspace edits are already R1 and run without asking): `plan` (read-only until the plan is approved), `accept-edits`, `strict` | Familiar mental model; maps onto the existing tiers, so small | S |
-| E1.4 | Headless contract: `--output-format json|stream-json`, `--max-cost`, stable exit codes, a reusable GitHub Action | CI use is a headline use case for DevOps | S |
+| E1.3 | **Done.** Permission modes (`core/modes.py`; `accept-edits` dropped because workspace edits are already R1 and run without asking): `plan` (read-only until the plan is approved), `read-only`, `strict` | Familiar mental model; maps onto the existing tiers, so small | S |
+| E1.4 | **Done.** Headless contract (`core/headless.py`, `action.yml`): `--output-format json|stream-json`, `--max-cost`, stable exit codes, a reusable GitHub Action | CI use is a headline use case for DevOps | S |
 | E1.5 | OpenTelemetry GenAI conventions: `gen_ai.operation.name`, `gen_ai.request.model`, `gen_ai.usage.*`, tool spans | Lets any OTel backend read our traces unchanged | S |
 
 ### E2: DevOps differentiators (what makes this the DevOps harness)

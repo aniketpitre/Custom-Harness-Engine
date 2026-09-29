@@ -169,23 +169,64 @@ def _usage_line(usage: dict | None) -> str:
     return f"{tokens:,} tokens, {fmt(usage.get('cost_usd'))}{extra}"
 
 
+def _goal_text(args) -> str | None:
+    if args.goal == ["-"]:
+        return sys.stdin.read().strip() or None
+    if args.goal_file:
+        with open(args.goal_file, encoding="utf-8") as fh:
+            return fh.read().strip() or None
+    return " ".join(args.goal).strip() or None
+
+
 def cmd_run(args) -> int:
+    from core import headless
+
     load_env()
     ensure_home()
-    if getattr(args, "max_cost", None):
+    goal = _goal_text(args)
+    if not goal:
+        print("no goal given (pass it as arguments, `-` for stdin, or --goal-file)", file=sys.stderr)
+        return headless.EXIT_USAGE
+    if args.max_cost:
         os.environ["HARNESS_MAX_COST_USD"] = str(args.max_cost)
-    from core.gateway.cli import handle_cli_input
+    if args.approval_timeout is not None:
+        os.environ["HARNESS_APPROVAL_TIMEOUT"] = str(args.approval_timeout)
+    if args.model:
+        os.environ["HARNESS_MODEL"] = args.model
+    from core.gateway.cli import UnknownAgent, handle_cli_input
 
+    fmt_ = args.output_format
     verification = ({"type": "file_content", "path": args.verify_file[0], "expected_content": args.verify_file[1]}
                     if args.verify_file else None)
-    receipt = asyncio.run(handle_cli_input(" ".join(args.goal), verification, args.agent,
-                                           permission_mode=getattr(args, "mode", None)))
-    print(receipt.model_dump_json(indent=2))
-    if theme.styled(sys.stderr):
+
+    def on_event(event: dict) -> None:
+        line = headless.stream_line(event)
+        if line:
+            print(line, flush=True)
+
+    try:
+        receipt = asyncio.run(handle_cli_input(
+            goal, verification, args.agent, permission_mode=args.mode,
+            on_event=on_event if fmt_ == "stream-json" else None, live_status=fmt_ in {"receipt", "text"}))
+    except UnknownAgent as error:
+        print(str(error), file=sys.stderr)
+        return headless.EXIT_USAGE
+    res = headless.result(receipt)
+    if fmt_ == "receipt":
+        print(receipt.model_dump_json(indent=2))
+    elif fmt_ == "text":
+        print(receipt.final_text)
+    else:
+        print(json.dumps(res, default=str, separators=(",", ":") if fmt_ == "stream-json" else None,
+                         indent=None if fmt_ == "stream-json" else 2))
+    if args.summary_file:
+        with open(args.summary_file, "a", encoding="utf-8") as fh:
+            fh.write(headless.summary_markdown(res))
+    if theme.styled(sys.stderr) and fmt_ in {"receipt", "text"}:
         ok = receipt.status == "success"
         print(f"\n{theme.glyph('receipt', sys.stderr)} {theme.status_mark('ok' if ok else 'fail', sys.stderr)} "
               f"{theme.paint(str(receipt.status), 'accent', sys.stderr)}  {_usage_line(receipt.usage)}", file=sys.stderr)
-    return 0 if receipt.status == "success" else 1
+    return res["exit_code"]
 
 
 def cmd_doctor(args) -> int:
@@ -363,8 +404,16 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--log-level", default="info")
     s.set_defaults(fn=cmd_serve)
 
-    r = sub.add_parser("run", help="run one goal and print the receipt")
-    r.add_argument("goal", nargs="+")
+    r = sub.add_parser("run", help="run one goal (headless-friendly; see --output-format and exit codes)",
+                       description="Exit codes: 0 success, 1 failure, 2 usage error, 3 a budget/turn/time limit "
+                                   "stopped the run.")
+    r.add_argument("goal", nargs="*", help="the goal; `-` reads it from stdin")
+    r.add_argument("--goal-file", metavar="PATH")
+    r.add_argument("--output-format", choices=["receipt", "json", "stream-json", "text"], default="receipt")
+    r.add_argument("--summary-file", metavar="PATH", help="append a Markdown summary (e.g. $GITHUB_STEP_SUMMARY)")
+    r.add_argument("--approval-timeout", type=float, metavar="SECONDS",
+                   help="how long to wait for a human; 0 denies anything that needs approval (CI)")
+    r.add_argument("--model", help="override HARNESS_MODEL for this run")
     r.add_argument("--agent", default="devops_agent")
     r.add_argument("--verify-file", nargs=2, metavar=("PATH", "EXPECTED"))
     r.add_argument("--max-cost", type=float, metavar="USD", help="stop the run once it has spent this much")

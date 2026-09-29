@@ -541,6 +541,42 @@ glyphs: {mascot: "🐝"}
 Styling shows only on an interactive terminal; piped output, `--json` and receipts stay plain. `NO_COLOR`,
 `HARNESS_ASCII=1` (no emoji) and `HARNESS_PLAIN=1` are honoured.
 
+## Headless and CI
+
+`harness run` is built for scripts:
+
+```bash
+harness run "Summarise failing pods in staging" --mode read-only --output-format json --max-cost 0.25
+echo "Check the rollout" | harness run - --output-format stream-json      # JSONL events, then the result
+harness run --goal-file task.md --output-format text --approval-timeout 0  # nobody to approve: deny instead of waiting
+```
+
+| `--output-format` | Output |
+|---|---|
+| `receipt` (default) | The full RunReceipt, pretty JSON |
+| `json` | One result object (`schema_version: 1`): status, outcome, verified, final text, model, usage and cost, actions with decisions, chain head, duration. No transcript |
+| `stream-json` | One JSON event per line while the run happens, ending with `{"type": "result", ...}` |
+| `text` | The final answer only |
+
+Exit codes are stable: `0` success, `1` failure (error, loop guard, cancelled, verification failed), `2` usage error,
+`3` a budget, turn or time limit stopped the run. `--summary-file $GITHUB_STEP_SUMMARY` appends a Markdown report.
+
+### GitHub Action
+
+The repository is also a GitHub Action (`action.yml`). It defaults to `read-only` mode, a $1 cap and no waiting for
+approvals, writes the job summary, and exposes `status`, `outcome`, `exit-code`, `cost-usd`, `session-id` and
+`result-file`. A complete PR-review workflow is in [`docs/examples/harness-pr-review.yml`](docs/examples/harness-pr-review.yml).
+
+```yaml
+- uses: aniketpitre/Custom-Harness-Engine@v0.3.0   # pin a tag or SHA
+  with:
+    goal: Review the changed Kubernetes manifests for risky settings.
+    model: groq/openai/gpt-oss-120b
+    max-cost: "0.50"
+  env:
+    GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+```
+
 ## Docker
 
 `./start.sh` (or `docker compose up --build`) starts a dev Vault, seeds it, mints a **read-only** token for the

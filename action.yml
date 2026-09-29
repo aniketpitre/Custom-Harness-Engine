@@ -1,0 +1,114 @@
+name: Harness Engine
+description: Run a policy-gated Harness Engine agent on a goal and report the result, cost and actions.
+author: aniketpitre
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  goal:
+    description: The goal for the agent (or use goal-file)
+    required: false
+  goal-file:
+    description: Path to a file that contains the goal
+    required: false
+  agent:
+    description: Agent profile id
+    default: devops_agent
+  mode:
+    description: "Permission mode: read-only (default here), plan, strict or default"
+    default: read-only
+  model:
+    description: LiteLLM model id, e.g. groq/openai/gpt-oss-120b or anthropic/claude-sonnet-4-5
+    required: false
+  max-cost:
+    description: Stop the run after spending this many USD (0 = no limit)
+    default: "1"
+  approval-timeout:
+    description: Seconds to wait for a human approval; 0 denies anything that needs one (no human in CI)
+    default: "0"
+  extras:
+    description: Optional extras to install, e.g. "devops,mcp"
+    default: ""
+  python-version:
+    default: "3.12"
+  fail-on:
+    description: "When to fail the step: failure (any non-success), limit (only a budget/turn/time limit) or never"
+    default: failure
+
+outputs:
+  status:
+    description: success or failure
+    value: ${{ steps.run.outputs.status }}
+  outcome:
+    description: completed, budget_exhausted, turn_limit, time_limit, error, cancelled, loop_guard, crashed
+    value: ${{ steps.run.outputs.outcome }}
+  exit-code:
+    description: 0 success, 1 failure, 2 usage error, 3 limit reached
+    value: ${{ steps.run.outputs.exit-code }}
+  cost-usd:
+    value: ${{ steps.run.outputs.cost-usd }}
+  session-id:
+    value: ${{ steps.run.outputs.session-id }}
+  result-file:
+    description: Path to the JSON result (schema_version 1)
+    value: ${{ steps.run.outputs.result-file }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Install Harness Engine
+      shell: bash
+      env:
+        EXTRAS: ${{ inputs.extras }}
+      run: |
+        spec="${GITHUB_ACTION_PATH}"
+        if [ -n "$EXTRAS" ]; then spec="${spec}[runtime,${EXTRAS}]"; else spec="${spec}[runtime]"; fi
+        python -m pip install --quiet "$spec"
+    - name: Run the agent
+      id: run
+      shell: bash
+      env:
+        HARNESS_HOME: ${{ runner.temp }}/harness-home
+        HARNESS_WORKSPACE: ${{ github.workspace }}
+        GOAL: ${{ inputs.goal }}
+        GOAL_FILE: ${{ inputs.goal-file }}
+        AGENT: ${{ inputs.agent }}
+        MODE: ${{ inputs.mode }}
+        MODEL: ${{ inputs.model }}
+        MAX_COST: ${{ inputs.max-cost }}
+        APPROVAL_TIMEOUT: ${{ inputs.approval-timeout }}
+        FAIL_ON: ${{ inputs.fail-on }}
+      run: |
+        set +e
+        result="${RUNNER_TEMP}/harness-result.json"
+        args=(run --agent "$AGENT" --mode "$MODE" --output-format json --summary-file "$GITHUB_STEP_SUMMARY"
+              --approval-timeout "$APPROVAL_TIMEOUT")
+        [ -n "$MODEL" ] && args+=(--model "$MODEL")
+        [ -n "$MAX_COST" ] && [ "$MAX_COST" != "0" ] && args+=(--max-cost "$MAX_COST")
+        if [ -n "$GOAL_FILE" ]; then args+=(--goal-file "$GOAL_FILE"); else args+=(-); fi
+        if [ -n "$GOAL_FILE" ]; then harness "${args[@]}" > "$result"; else printf '%s' "$GOAL" | harness "${args[@]}" > "$result"; fi
+        code=$?
+        python - "$result" "$code" <<'PY' >> "$GITHUB_OUTPUT"
+        import json, sys
+        path, code = sys.argv[1], sys.argv[2]
+        try:
+            r = json.load(open(path))
+        except Exception:
+            r = {}
+        print(f"exit-code={code}")
+        print(f"status={r.get('status', 'failure')}")
+        print(f"outcome={r.get('outcome', 'error')}")
+        print(f"session-id={r.get('session_id', '')}")
+        cost = (r.get('usage') or {}).get('cost_usd')
+        print(f"cost-usd={'' if cost is None else cost}")
+        print(f"result-file={path}")
+        PY
+        case "$FAIL_ON" in
+          never) exit 0 ;;
+          limit) [ "$code" = "3" ] && exit 3 || exit 0 ;;
+          *) exit "$code" ;;
+        esac

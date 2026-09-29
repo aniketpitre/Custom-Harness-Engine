@@ -17,6 +17,10 @@ from core.runs import RunManager
 DEFAULT_AGENT = "devops_agent"
 
 
+class UnknownAgent(SystemExit):
+    pass
+
+
 def _live_status(engine):
     """Themed progress on stderr while a goal runs: which tool is working and how it ended."""
     err = sys.stderr
@@ -40,12 +44,14 @@ async def handle_cli_input(
     agents: AgentRegistry | None = None,
     runs: RunManager | None = None,
     permission_mode: str | None = None,
+    on_event=None,
+    live_status: bool = True,
 ) -> RunReceipt:
     agents = agents or AgentRegistry()
     engine = get_engine()
     engine.extras["agents"] = agents
     if agents.get_agent(agent_id) is None:
-        raise SystemExit(f"Unknown agent: {agent_id}")
+        raise UnknownAgent(f"Unknown agent: {agent_id}")
     runs = runs or RunManager(engine, agents)
     await engine.ensure_started()
     session_id = str(uuid.uuid4())
@@ -57,9 +63,14 @@ async def handle_cli_input(
         conn.close()
     channel = start_telegram(engine.broker)
     terminal = terminal_channel(engine.broker)
-    live = _live_status(engine) if theme.styled(sys.stderr) else None
+    live = _live_status(engine) if live_status and theme.styled(sys.stderr) else None
     try:
-        await runs.run_inline(session_id)
+        if not await runs.start(session_id):
+            raise RuntimeError(f"Session {session_id} is not pending")
+        if on_event is not None:
+            async for _id, event in runs.buffers[session_id].tail(keepalive=3600):
+                on_event(event)
+        await runs.wait(session_id)
     finally:
         if channel:
             await channel.stop()
