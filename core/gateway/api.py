@@ -151,6 +151,7 @@ class CreateSessionRequest(BaseModel):
     environment: Dict[str, str] = {}
     verification: Optional[Dict[str, Any]] = None
     run: bool = False
+    permission_mode: Optional[str] = None   # default | plan | read-only | strict
 
 
 def _conn():
@@ -161,10 +162,17 @@ def _conn():
 async def start_session(req: CreateSessionRequest):
     if not registry.get_agent(req.agent_id):
         raise HTTPException(status_code=404, detail="Agent not found")
+    from core.modes import normalize
+
+    try:
+        mode = normalize(req.permission_mode)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     session_id = str(uuid.uuid4())
     conn = _conn()
     try:
-        create_session(conn, session_id, req.agent_id, req.goal, req.environment, verification=req.verification)
+        create_session(conn, session_id, req.agent_id, req.goal, req.environment, verification=req.verification,
+                       permission_mode=mode)
     finally:
         conn.close()
     if req.run:
@@ -303,7 +311,7 @@ def fork_session(session_id: str, req: ForkSessionRequest):
         goal = req.goal_override or session["goal"]
         create_session(conn, new_id, session["agent_id"], goal, session["environment"],
                        parent_session_id=session_id, parent_event_id=req.event_id,
-                       verification=session.get("verification"))
+                       verification=session.get("verification"), permission_mode=session.get("permission_mode"))
         try:
             copied = eventlog.fork_events(conn, session_id, new_id, req.event_id)
         except KeyError as error:

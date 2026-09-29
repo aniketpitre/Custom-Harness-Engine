@@ -21,6 +21,7 @@ class AgentProfile(BaseModel):
     deny_tools: List[str] = Field(default_factory=list)
     rules: List[str] = Field(default_factory=list)  # e.g. "deny:bash(rm *)", "ask:web_fetch"
     verification: Optional[Dict[str, str]] = None
+    permission_mode: Optional[str] = None  # default | plan | read-only | strict (core/modes.py)
     verify_with_agent: bool = False  # independent read-only verifier agent checks the final answer
 
 

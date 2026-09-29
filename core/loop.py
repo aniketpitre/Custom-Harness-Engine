@@ -16,6 +16,8 @@ from core.compaction import apply_pruned, estimate_tokens, needs_compaction, pla
 from core.engine import Engine, expand_capabilities, get_engine
 from core.llm import ContextOverflow, LLMError, ToolCall, complete, simple_completion
 from core.memory.store import init_db, record_memory_use
+from core.modes import READ_ONLY_MODES, default_mode
+from core.modes import normalize as normalize_mode
 from core.policy import parse_rule
 from core.primitives.agent import AgentProfile
 from core.primitives.context import ContextPacket
@@ -151,6 +153,8 @@ async def run_agent_generator(
     budget: Budget | None = None,
     depth: int = 0,
     agent_id: str | None = None,
+    mode: str | None = None,
+    after_plan: str | None = None,
 ) -> AsyncGenerator[dict[str, Any], None]:
     init_tracing()
     engine = engine or get_engine()
@@ -174,8 +178,19 @@ async def run_agent_generator(
                                 cost_limit=(profile.max_cost_usd if profile and profile.max_cost_usd else st.max_cost_usd)),
         domain=domain, depth=depth, engine=engine, extras={"sink": sink, "context": context})
     max_turns = (profile.max_turns if profile and profile.max_turns else st.max_turns)
+    # mode: a recorded mode change (plan approved) > explicit > agent profile > HARNESS_PERMISSION_MODE
+    changed = [e for e in sink.events({"mode_change"})]
+    ctx.mode = (changed[-1]["payload"]["to"] if changed else None) or normalize_mode(mode) \
+        or normalize_mode(profile.permission_mode if profile else None) or default_mode()
+    ctx.extras["after_plan"] = normalize_mode(after_plan) or "default"
+    if ctx.mode == "plan":
+        ctx.allowed.add("Plan")
     snapshot = engine.snapshot()
-    tools = snapshot.schemas(ctx.allowed, ctx.deny_tools)
+
+    def visible_tools():
+        return snapshot.schemas(ctx.allowed, ctx.deny_tools, read_only=ctx.mode in READ_ONLY_MODES)
+
+    tools = visible_tools()
     prompt_conn = init_db(st.db_path)  # curated memory always comes from the real database
     try:
         system = {"role": "system", "content": build_system_prompt(
@@ -187,7 +202,11 @@ async def run_agent_generator(
         _seed_history(sink, initial_history)
     pairs = sink.pairs()
     if not pairs or pairs[-1][1]["role"] == "assistant":
-        sink.append("user_msg", {"content": build_prompt(context)})
+        note = {"plan": "\n\n[Plan mode] You can only use read-only tools. Investigate, then call exit_plan_mode "
+                        "with a concrete plan; you may make changes only after it is approved.",
+                "read-only": "\n\n[Read-only mode] Only read-only tools are available. Report findings and "
+                             "recommendations; do not attempt changes."}.get(ctx.mode, "")
+        sink.append("user_msg", {"content": build_prompt(context) + note})
         hits = [h["id"] for h in context.memory_hits if "id" in h]
         if hits:
             use_conn = init_db(st.db_path)
@@ -197,7 +216,8 @@ async def run_agent_generator(
                 use_conn.close()
     sink.append("run_start", {"model": state.model, "agent_id": ctx.agent_id, "goal": context.goal.raw_input,
                               "system_sha256": hashlib.sha256(system["content"].encode()).hexdigest(),
-                              "tools": [t["function"]["name"] for t in tools], "generation": snapshot.generation})
+                              "tools": [t["function"]["name"] for t in tools], "generation": snapshot.generation,
+                              "mode": ctx.mode})
     await engine.hooks.emit("session_start", {"session_id": session_id, "agent_id": ctx.agent_id})
     run_counter.add(1, {"agent": ctx.agent_id})
     sem = asyncio.Semaphore(st.max_parallel_tools)
@@ -261,9 +281,9 @@ async def run_agent_generator(
                 break
             for text in sink.drain_interrupts():
                 yield {"type": "interruption_received", "content": text}
-            if ctx.extras.pop("refresh_tools", False):  # this run registered a tool: expose it next turn
+            if ctx.extras.pop("refresh_tools", False):  # new tool registered or mode changed: refresh next turn
                 snapshot = engine.snapshot()
-                tools = snapshot.schemas(ctx.allowed, ctx.deny_tools)
+                tools = visible_tools()
             await engine.hooks.emit("before_turn", {"session_id": session_id, "turn": ctx_turns})
             await compact()
             for ev in yield_events:

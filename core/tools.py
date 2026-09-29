@@ -69,8 +69,9 @@ class RegistrySnapshot:
     def get(self, name: str) -> ToolSpec | None:
         return self.tools.get(name)
 
-    def schemas(self, allowed: set[str], deny: set[str] = frozenset()) -> list[dict]:
-        specs = [s for s in self.tools.values() if s.capability in allowed and s.name not in deny]
+    def schemas(self, allowed: set[str], deny: set[str] = frozenset(), read_only: bool = False) -> list[dict]:
+        specs = [s for s in self.tools.values() if s.capability in allowed and s.name not in deny
+                 and (s.read_only or not read_only)]
         return [s.schema() for s in sorted(specs, key=lambda s: s.name)]
 
 
@@ -151,6 +152,7 @@ class RunCtx:
     depth: int = 0
     engine: Any = None
     extras: dict[str, Any] = field(default_factory=dict)
+    mode: str = "default"          # permission mode, see core/modes.py
 
     @property
     def workspace(self) -> Path:
@@ -254,7 +256,7 @@ async def invoke(snapshot: RegistrySnapshot, call_id: str, name: str, args: Any,
         remembered = (name, digest) in ctx.session_approvals or ctx.broker.is_remembered(name, digest)
         decision = decide(name=name, policy_tool=tool_label, policy_action=action_label, tier=tier,
                           read_only=spec.read_only, args=args, rules=ctx.rules, tainted=ctx.tainted,
-                          pre_approved=remembered, hard_deny_reason=hard)
+                          pre_approved=remembered, hard_deny_reason=hard, mode=ctx.mode)
         from core.telemetry import policy_counter
 
         policy_counter.add(1, {"decision": decision.decision})

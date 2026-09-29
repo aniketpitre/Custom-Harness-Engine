@@ -231,6 +231,20 @@ hooks may tighten (never loosen); remembered approvals apply to R2 only
 ASK → broker: args-hash bound, approver allowlist, timeout → deny
 ```
 
+### Permission modes
+
+On top of the policy table, every run has a mode (`harness run --mode`, `permission_mode` on `POST /sessions`
+or in an agent profile, or `HARNESS_PERMISSION_MODE`):
+
+| Mode | Behaviour |
+|---|---|
+| `default` | The policy table: R0/R1 run, R2/R3 ask, R4 denied |
+| `plan` | Only read-only tools are offered. The agent investigates, then calls `exit_plan_mode` with its plan; you approve it on the terminal, API or Telegram and the run continues in `default`. A rejection (with your note) sends it back to planning. The approval is recorded in the event log |
+| `read-only` | Read-only for the whole run with no way out: investigations, audits, CI checks |
+| `strict` | Every non-read-only action needs approval, including R1 edits; remembered approvals and `allow:` rules are ignored |
+
+There is no bypass mode: R4 stays denied and R3 always asks. Subagents inherit the mode (read-only under `plan`).
+
 ### Prompt-injection and exfiltration defences
 - **Untrusted wrapping:** `web_fetch`, `web_search`, `kubectl_logs`, `argocd_app_get`, MCP output and
   self-written tool output are wrapped in `<external ... trust="untrusted">`, stripped of zero-width and bidi
@@ -448,6 +462,7 @@ Config files are looked up in `$HARNESS_HOME/config/`, then `./config/` (checkou
 | `HARNESS_STAGING_APPS` | ArgoCD app globs treated as staging (R2); others are R3 | none |
 | `HARNESS_SANDBOX` | `none` / `bwrap` / `docker` for `bash` | `none` |
 | `HARNESS_TOKEN_BUDGET`, `HARNESS_MAX_TURNS`, `HARNESS_MAX_SECONDS` | Run limits | `200000` / `30` / `3600` |
+| `HARNESS_PERMISSION_MODE` | Default permission mode: `default`, `plan`, `read-only`, `strict` | `default` |
 | `HARNESS_MAX_COST_USD` | USD ceiling per run, subagents included (also `max_cost_usd` per agent, `harness run --max-cost`); `0` = no limit | `0` |
 | `HARNESS_PRICES` | Price overrides, USD per million tokens: `{"my/model": {"input": 0.5, "output": 1.5}}`. Local models are free; models without a price are reported as *unpriced* | LiteLLM's bundled map |
 | `HARNESS_CONTEXT_WINDOW`, `HARNESS_RESERVE_TOKENS`, `HARNESS_KEEP_RECENT_TOKENS` | Compaction | `128000` / `16384` / `20000` |
@@ -487,7 +502,7 @@ All routes except `/health` need `Authorization: Bearer <token>` and the listed 
 | GET | `/agents`, `/agents/{id}` | `agents:read` | Profiles and lifecycle state |
 | POST | `/sessions` | `sessions:write` | Create (`run: true` starts it; optional `verification`, `environment`) |
 | POST | `/sessions/{id}/run` · `/cancel` · `/interrupt` · `/fork` · `/rewind` | `sessions:write` | Control |
-| GET | `/sessions?status=&agent_id=&limit=` · `/usage?days=30&by=model|agent|day|session` | `sessions:read` | Session list with tokens and cost; spend report |
+| GET | `/sessions?status=&agent_id=&limit=` · `/usage?days=30&by=model\|agent\|day\|session` | `sessions:read` | Session list with tokens and cost; spend report |
 | GET | `/sessions/{id}` · `/events` · `/stream` · `/verify-chain` | `sessions:read` | State, event log, SSE (`Last-Event-ID`), tamper check |
 | GET / POST | `/approvals` · `/approvals/{id}` | `approvals:read/write` | Pending approvals / decide |
 | GET / POST / DELETE | `/cron` · `/cron/{id}/pause` · `/cron/{id}` · `/heartbeat` | `cron:*` | Persistent schedules |

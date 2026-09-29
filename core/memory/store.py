@@ -142,6 +142,7 @@ _ADD_COLUMNS = {
         "prompt_tokens": "INTEGER",
         "completion_tokens": "INTEGER",
         "cost_usd": "REAL",
+        "permission_mode": "TEXT",
     },
     "memory_entries": {"superseded_by": "TEXT"},
 }
@@ -305,14 +306,15 @@ def create_session(
     parent_session_id: str | None = None,
     parent_event_id: str | None = None,
     verification: dict | None = None,
+    permission_mode: str | None = None,
 ) -> None:
     now = _now()
     conn.execute(
         """INSERT INTO sessions (id, agent_id, goal, status, environment, parent_session_id,
-            parent_event_id, verification, created_at, updated_at)
-            VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)""",
+            parent_event_id, verification, permission_mode, created_at, updated_at)
+            VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)""",
         (session_id, agent_id, goal, json.dumps(environment or {}), parent_session_id,
-         parent_event_id, json.dumps(verification) if verification else None, now, now),
+         parent_event_id, json.dumps(verification) if verification else None, permission_mode, now, now),
     )
     conn.commit()
 
@@ -335,6 +337,7 @@ def _session_row(row) -> dict:
         "prompt_tokens": row["prompt_tokens"] if "prompt_tokens" in keys else None,
         "completion_tokens": row["completion_tokens"] if "completion_tokens" in keys else None,
         "cost_usd": row["cost_usd"] if "cost_usd" in keys else None,
+        "permission_mode": row["permission_mode"] if "permission_mode" in keys else None,
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }

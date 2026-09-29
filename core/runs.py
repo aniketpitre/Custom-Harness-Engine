@@ -189,7 +189,8 @@ class RunManager:
             buf = self.buffers[session_id]
             final = None
             async for event in run_agent_generator(session_id, context, profile.allowed_tools, profile,
-                                                   engine=self.engine, sink=sink):
+                                                   engine=self.engine, sink=sink,
+                                                   mode=session.get("permission_mode")):
                 if event["type"] == "final_receipt":
                     final = event
                 await buf.publish(_json_event(event))

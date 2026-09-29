@@ -39,6 +39,7 @@ async def handle_cli_input(
     agent_id: str = DEFAULT_AGENT,
     agents: AgentRegistry | None = None,
     runs: RunManager | None = None,
+    permission_mode: str | None = None,
 ) -> RunReceipt:
     agents = agents or AgentRegistry()
     engine = get_engine()
@@ -50,7 +51,8 @@ async def handle_cli_input(
     session_id = str(uuid.uuid4())
     conn = init_db()
     try:
-        create_session(conn, session_id, agent_id, raw_text, verification=verification_request)
+        create_session(conn, session_id, agent_id, raw_text, verification=verification_request,
+                       permission_mode=permission_mode)
     finally:
         conn.close()
     channel = start_telegram(engine.broker)

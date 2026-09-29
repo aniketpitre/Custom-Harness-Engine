@@ -178,7 +178,8 @@ def cmd_run(args) -> int:
 
     verification = ({"type": "file_content", "path": args.verify_file[0], "expected_content": args.verify_file[1]}
                     if args.verify_file else None)
-    receipt = asyncio.run(handle_cli_input(" ".join(args.goal), verification, args.agent))
+    receipt = asyncio.run(handle_cli_input(" ".join(args.goal), verification, args.agent,
+                                           permission_mode=getattr(args, "mode", None)))
     print(receipt.model_dump_json(indent=2))
     if theme.styled(sys.stderr):
         ok = receipt.status == "success"
@@ -367,6 +368,8 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--agent", default="devops_agent")
     r.add_argument("--verify-file", nargs=2, metavar=("PATH", "EXPECTED"))
     r.add_argument("--max-cost", type=float, metavar="USD", help="stop the run once it has spent this much")
+    r.add_argument("--mode", choices=["default", "plan", "read-only", "strict"],
+                   help="permission mode: plan = read-only until you approve the plan")
     r.set_defaults(fn=cmd_run)
 
     d = sub.add_parser("doctor", help="check the installation and print fixes")

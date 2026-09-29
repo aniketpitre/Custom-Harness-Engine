@@ -61,6 +61,7 @@ def decide(
     tainted: bool,
     pre_approved: bool = False,
     hard_deny_reason: str | None = None,
+    mode: str = "default",
 ) -> PolicyDecision:
     def make(decision: str, tier_: RiskTier, reason: str, approved_by: str | None = None):
         return PolicyDecision(decision=decision, risk_tier=tier_, reason=reason,
@@ -74,7 +75,13 @@ def decide(
             return make("DENY", tier, f"Denied by rule deny:{rule.tool}")
     if tier is RiskTier.R4:
         return make("DENY", tier, "Destructive actions are denied by default")
+    if mode in {"plan", "read-only"} and not read_only:
+        hint = " Investigate, then call exit_plan_mode with your plan." if mode == "plan" else ""
+        return make("DENY", tier, f"{mode} mode allows read-only tools only.{hint}")
     effective = tier
+    if mode == "strict":
+        pre_approved = False
+        rules = [r for r in rules if r.effect != "allow"]
     if tainted and not read_only:
         effective = min(bump(tier), RiskTier.R3)  # untrusted content entered the context this run
     for rule in rules:
@@ -90,4 +97,6 @@ def decide(
         if tainted and effective is not tier:
             why += " (raised because untrusted content entered the context)"
         return make("REQUIRE_APPROVAL", effective, why)
+    if mode == "strict" and not read_only:
+        return make("REQUIRE_APPROVAL", effective, "strict mode: every change needs approval")
     return make("ALLOW", effective, "Action is allowed by the policy table")

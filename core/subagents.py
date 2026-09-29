@@ -19,6 +19,7 @@ MAX_DEPTH = 2
 async def run_subagent(parent: RunCtx, goal: str, *, profile: AgentProfile | None = None,
                        capabilities: list[str] | None = None, label: str = "subagent") -> dict[str, Any]:
     from core.loop import DBSink, run_agent_generator
+    from core.modes import child_mode
     from core.receipts import derive_status
 
     st = parent.settings
@@ -48,7 +49,8 @@ async def run_subagent(parent: RunCtx, goal: str, *, profile: AgentProfile | Non
         async def go() -> None:
             nonlocal final
             async for ev in run_agent_generator(session_id, context, sorted(allowed), profile, engine=engine,
-                                                sink=sink, budget=parent.budget, depth=parent.depth + 1):
+                                                sink=sink, budget=parent.budget, depth=parent.depth + 1,
+                                                mode=child_mode(parent.mode)):
                 if ev["type"] == "final_receipt":
                     final = ev["receipt"]
 
