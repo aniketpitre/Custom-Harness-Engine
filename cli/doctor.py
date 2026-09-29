@@ -34,6 +34,29 @@ def _module(mod: str, extra: str, needed_for: str) -> Check:
                  f'pip install "harness-engine[{extra}]"')
 
 
+def _secret_store_checks() -> list[Check]:
+    from core import keystore
+    from core.home import _read_env_file, keyring_items
+
+    values = _read_env_file()
+    items = keyring_items(values)
+    if items:
+        if not keystore.available():
+            return [Check("secret store", FAIL, f"{len(items)} secret(s) are in the OS keyring, but no keyring backend is usable "
+                          f"({keystore.backend_name()})", 'pip install "harness-engine[keyring]" and unlock the keyring, '
+                          "or re-run `harness init --secret-store file` after `harness secret set NAME`")]
+        missing = [n for n in items if keystore.get(n) is None]
+        if missing:
+            return [Check("secret store", FAIL, f"missing from the keyring: {', '.join(missing)}",
+                          "; ".join(f"harness secret set {n}" for n in missing))]
+        return [Check("secret store", OK, f"OS keyring ({keystore.backend_name()}), {len(items)} secret(s)")]
+    loose = [k for k in values if keystore.is_secret_name(k)]
+    if loose and keystore.available():
+        return [Check("secret store", WARN, f"{len(loose)} secret(s) are stored in the .env file although the OS keyring "
+                      f"({keystore.backend_name()}) is available", "run `harness init -y --secret-store keyring` to move them")]
+    return [Check("secret store", OK, "mode-600 .env file" if loose else "no secrets stored yet")]
+
+
 def collect(online: bool = False, port: int | None = None) -> list[Check]:
     from core.home import env_file, harness_home, is_private, load_env
     from core.registry import AgentRegistry
@@ -57,6 +80,7 @@ def collect(online: bool = False, port: int | None = None) -> list[Check]:
         checks.append(Check("env file", OK if private else FAIL, f"{env} ({'mode 600' if private else 'readable by others'})",
                             "" if private else f"chmod 600 {env}"))
 
+    checks.extend(_secret_store_checks())
     checks.append(Check("api token", OK if st.api_tokens else FAIL,
                         "configured" if st.api_tokens else "HARNESS_API_TOKEN is not set (API refuses all requests)",
                         "" if st.api_tokens else "run `harness init` (or export HARNESS_API_TOKEN=$(openssl rand -hex 32))"))

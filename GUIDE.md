@@ -5,7 +5,7 @@
 `harness init` writes `~/.harness/.env` (mode 600) and `~/.harness/config/agents.yaml`. Everything is configured
 with environment variables (`HARNESS_*`), optionally `~/.harness/config/settings.yaml` (`model.primary`,
 `model.fallback`, `otel.endpoint`). Precedence: real environment → `.env` → settings.yaml → packaged defaults.
-Secrets come from the environment/`.env` first, then Vault (optional). Run `harness doctor` after any change.
+Secrets come from the environment/`.env` first, then the OS keyring (`harness secret`), then Vault (optional). Run `harness doctor` after any change.
 
 | Variable | Purpose | Default |
 |---|---|---|

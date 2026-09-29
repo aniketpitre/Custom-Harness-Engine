@@ -34,7 +34,17 @@ def isolated_env(tmp_path, monkeypatch):
     secrets.clear_cache()
     forget_migrations()
     set_broker(ApprovalBroker(timeout=2))
+    try:                                            # never touch a real OS keyring from tests
+        import keyring
+        from keyring.backends.fail import Keyring as NoKeyring
+
+        previous_keyring = keyring.get_keyring()
+        keyring.set_keyring(NoKeyring())
+    except ImportError:
+        keyring = previous_keyring = None
     yield workspace
+    if keyring is not None:
+        keyring.set_keyring(previous_keyring)
     set_broker(None)
     os.environ.clear()
     os.environ.update(saved)

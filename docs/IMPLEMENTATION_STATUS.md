@@ -57,7 +57,7 @@ C7 persistent cron, heartbeat, list/pause/delete - done. C8 `AGENTS.md` - done.
 |---|---|
 | `harness` command (`init`, `serve`, `run`, `doctor`, `token`, `sessions`, `approvals`, `plugins`, `version`) | Done (`cli/main.py`) |
 | Defaults packaged in the wheel; per-user config in `~/.harness` (`HARNESS_HOME`) | Done (`core/home.py`, `core/defaults/`); the old `config/` directory moved |
-| No Vault/Docker needed: mode-600 `.env` written by `harness init`, Vault optional | Done |
+| No Vault/Docker needed: mode-600 `.env` written by `harness init`, Vault optional; secrets go to the OS keyring (`core/keystore.py`, `harness secret`, `--secret-store`) with a mode-600 file fallback | Done |
 | `harness doctor` with per-check fixes and exit codes | Done (`cli/doctor.py`) |
 | One-line installer (`install.sh`: uv → pipx → private venv; git/PyPI/wheel/path sources) | Done; tested with dry runs and a real clean-venv install |
 | Wheel built, installed into an empty directory and run from another cwd | Covered by `tests/test_install_and_cli.py::TestWheel` |

@@ -406,7 +406,7 @@ archive/git URL or local path) and `HARNESS_EXTRAS`.
 
 `harness init` writes everything to `~/.harness` (override with `HARNESS_HOME`): a mode-600 `.env` (provider key,
 API token, optional Telegram), `config/agents.yaml` (yours to edit) and `data/` (database, checkpoints, skills).
-No Vault, Docker or database server is required; Vault is an optional secrets provider.
+No Vault, Docker or database server is required; Vault is an optional secrets provider. `harness init` keeps secrets in your OS keyring when one is available (`--secret-store auto|keyring|file`), and falls back to the mode-600 `.env` on headless machines; there is deliberately no passphrase-encrypted file, since a key stored next to the file adds no protection.
 
 | Command | Purpose |
 |---|---|
@@ -415,6 +415,7 @@ No Vault, Docker or database server is required; Vault is an optional secrets pr
 | `harness serve [--host --port]` | Start the API (refuses to start without a token; warns on non-loopback binds) |
 | `harness run GOAL [--agent] [--verify-file PATH TEXT]` | One-shot run; prints the receipt JSON; exit code reflects success |
 | `harness token` | Print the API token (for `curl`) |
+| `harness secret list\|set NAME\|delete NAME` | Manage secrets in the OS keyring (macOS Keychain, Windows Credential Locker, Secret Service/KWallet); values are never printed |
 | `harness sessions [ID]` | Recent sessions / one session |
 | `harness approvals list|approve|deny ID` | Manage approvals on a running server |
 | `harness plugins` | Plugin states and tools |

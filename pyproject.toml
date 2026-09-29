@@ -28,12 +28,13 @@ harness = "cli.main:main"
 [project.optional-dependencies]
 telegram = ["python-telegram-bot>=21.0"]
 vault = ["hvac"]
+keyring = ["keyring"]
 devops = ["kubernetes", "GitPython"]
 mcp = ["mcp"]
 otel = ["opentelemetry-exporter-otlp", "opentelemetry-instrumentation-litellm"]
 setup = ["questionary"]
 runtime = ["harness-engine[telegram,vault,devops,mcp,otel]"]
-dev = ["pytest", "pytest-asyncio", "ruff", "harness-engine[runtime,setup]"]
+dev = ["pytest", "pytest-asyncio", "ruff", "harness-engine[runtime,setup,keyring]"]
 
 [tool.setuptools.dynamic]
 version = {attr = "core.__version__"}

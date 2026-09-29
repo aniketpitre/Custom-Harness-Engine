@@ -7,7 +7,7 @@ set -eu
 
 # Default: the GitHub source archive (no git needed). Until a PyPI release exists this is the way to install.
 SOURCE="${HARNESS_SOURCE:-https://github.com/aniketpitre/Custom-Harness-Engine/archive/refs/heads/main.tar.gz}"
-EXTRAS="${HARNESS_EXTRAS-runtime}"
+EXTRAS="${HARNESS_EXTRAS-runtime,keyring}"
 if [ -n "$EXTRAS" ]; then BRACKET="[$EXTRAS]"; else BRACKET=""; fi
 case "$SOURCE" in
   git+*|http*) SPEC="harness-engine$BRACKET @ $SOURCE" ;;

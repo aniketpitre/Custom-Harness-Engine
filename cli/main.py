@@ -70,18 +70,62 @@ def cmd_init(args) -> int:
             if uid:
                 values["HARNESS_APPROVERS"] = f"telegram:{uid}"
 
-    path = write_env(values)
+    from core import keystore
+
+    store = args.secret_store
+    if store == "auto":
+        store = "keyring" if keystore.available() else "file"
+    elif store == "keyring" and not keystore.available():
+        print(f"No usable OS keyring here ({keystore.backend_name()}). Install one, or use --secret-store file.",
+              file=sys.stderr)
+        return 2
+    path = write_env(values, store=store)
     agents = home / "config" / "agents.yaml"
     if not agents.exists() and not args.no_agents:
         shutil.copy(DEFAULTS_DIR / "agents.yaml", agents)
-    print(f"Harness home: {home}\nSecrets/settings written to {path} (mode 600)")
+    where = (f"OS keyring ({keystore.backend_name()}); settings in {path}" if store == "keyring"
+             else f"{path} (mode 600)")
+    print(f"Harness home: {home}\nSecrets stored in: {where}")
     print(f"Agents: {agents}  (edit to change what agents may do)")
-    print("API token: kept in the .env file; show it with `harness token`.")
+    print("API token: show it with `harness token`.")
     load_env(override=True)
     from cli.doctor import collect, render
 
     print("\n" + render(collect()))
     print("\nNext: `harness serve`   then   `harness run \"List the files in the workspace\"`")
+    return 0
+
+
+def cmd_secret(args) -> int:
+    """harness secret list|set NAME|delete NAME - manage individual secrets (e.g. rotate a provider key)."""
+    from core import keystore
+    from core.home import _read_env_file, delete_secret, keyring_items
+
+    load_env()
+    file_values = _read_env_file()
+    in_keyring = set(keyring_items(file_values))
+    if args.action == "list":
+        for name in sorted(in_keyring | {k for k in file_values if keystore.is_secret_name(k) and k != keystore.ITEMS_VAR}):
+            print(f"{name:<45} {'keyring' if name in in_keyring else 'file (.env)'}")
+        return 0
+    if not args.name:
+        print("secret name required", file=sys.stderr)
+        return 2
+    if args.action == "delete":
+        if delete_secret(args.name):
+            print("deleted")
+            return 0
+        print("not found", file=sys.stderr)
+        return 1
+    value = os.environ.get(args.from_env, "") if args.from_env else getpass.getpass(f"{args.name} (hidden): ")
+    if not value:
+        print("empty value", file=sys.stderr)
+        return 2
+    # keep a secret where the installation already keeps its secrets
+    use_keyring = bool(in_keyring) and keystore.available()
+    write_env({args.name: value}, store="keyring" if use_keyring else "file")
+    os.environ[args.name] = value
+    print(f"{args.name} stored in {'the OS keyring' if use_keyring else str(env_file())}")
     return 0
 
 
@@ -227,6 +271,8 @@ def build_parser() -> argparse.ArgumentParser:
     i.add_argument("--telegram-bot-token-env", metavar="VAR")
     i.add_argument("--telegram-chat-id")
     i.add_argument("--approver", help="allowed approver ids, e.g. telegram:123")
+    i.add_argument("--secret-store", choices=["auto", "keyring", "file"], default="auto",
+                   help="where secrets live: the OS keyring (default when available) or the mode-600 .env file")
     i.add_argument("--no-agents", action="store_true", help="do not copy the default agents.yaml")
     i.add_argument("-y", "--yes", action="store_true", help="non-interactive: use defaults and flags only")
     i.set_defaults(fn=cmd_init)
@@ -249,6 +295,12 @@ def build_parser() -> argparse.ArgumentParser:
     d.set_defaults(fn=cmd_doctor)
 
     sub.add_parser("token", help="print the API token").set_defaults(fn=cmd_token)
+
+    sc = sub.add_parser("secret", help="list, set or delete individual secrets (never prints values)")
+    sc.add_argument("action", choices=["list", "set", "delete"])
+    sc.add_argument("name", nargs="?")
+    sc.add_argument("--from-env", metavar="VAR", help="read the value from this environment variable")
+    sc.set_defaults(fn=cmd_secret)
 
     ss = sub.add_parser("sessions", help="list recent sessions or show one")
     ss.add_argument("session_id", nargs="?")

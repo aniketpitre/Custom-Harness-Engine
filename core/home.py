@@ -57,27 +57,68 @@ def env_file() -> Path:
     return harness_home() / ".env"
 
 
-def load_env(override: bool = False) -> list[str]:
-    """Load $HARNESS_HOME/.env into os.environ (real environment variables win). Returns keys set."""
+def keyring_items(values: dict[str, str] | None = None) -> list[str]:
+    from core.keystore import ITEMS_VAR
+
+    raw = (values if values is not None else _read_env_file()).get(ITEMS_VAR, "")
+    return [n.strip() for n in raw.split(",") if n.strip()]
+
+
+def _read_env_file() -> dict[str, str]:
     path = env_file()
-    if not path.is_file():
-        return []
+    return parse_env(path.read_text(encoding="utf-8")) if path.is_file() else {}
+
+
+def load_env(override: bool = False) -> list[str]:
+    """Load $HARNESS_HOME/.env, then any secrets kept in the OS keyring, into os.environ.
+
+    Real environment variables always win (unless `override`). Returns the keys that were set."""
+    from core import keystore
+
+    file_values = _read_env_file()
     set_keys = []
-    for key, value in parse_env(path.read_text(encoding="utf-8")).items():
+    for key, value in file_values.items():
         if override or key not in os.environ:
             os.environ[key] = value
             set_keys.append(key)
+    for name in keyring_items(file_values):
+        if override or name not in os.environ:
+            secret = keystore.get(name)
+            if secret is not None:
+                os.environ[name] = secret
+                set_keys.append(name)
     return set_keys
 
 
-def write_env(values: dict[str, str]) -> Path:
-    """Merge `values` into the .env file (mode 600, atomic). Existing unrelated keys are preserved."""
+def write_env(values: dict[str, str], store: str = "file") -> Path:
+    """Persist settings. `store="keyring"` keeps secret-looking values in the OS keyring (verified by
+    reading them back) and the rest in the mode-600 .env; `"file"` keeps everything in the .env.
+    Existing unrelated keys are preserved; secrets are migrated between stores as requested."""
+    from core import keystore
+
     ensure_home()
-    path = env_file()
-    merged = parse_env(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    merged = _read_env_file()
     merged.update({k: v for k, v in values.items() if v is not None})
-    body = "# Written by `harness init`. Keep private (mode 600).\n" + "".join(
-        f"{k}={v}\n" for k, v in merged.items())
+    items = set(keyring_items(merged))
+    if store == "keyring":
+        for name in [n for n in merged if keystore.is_secret_name(n) and n != keystore.ITEMS_VAR]:
+            keystore.set_secret(name, merged.pop(name))
+            items.add(name)
+        # secrets that already live in the keyring stay there
+        merged[keystore.ITEMS_VAR] = ",".join(sorted(items))
+    else:  # file: bring any keyring-held secrets back so the file is the single source
+        for name in sorted(items):
+            secret = keystore.get(name)
+            if secret is not None and name not in merged:
+                merged[name] = secret
+        merged.pop(keystore.ITEMS_VAR, None)
+    return _write_file(merged)
+
+
+def _write_file(values: dict[str, str]) -> Path:
+    """Atomically write the .env with mode 600."""
+    path = env_file()
+    body = "# Written by `harness init`. Keep private (mode 600).\n" + "".join(f"{k}={v}\n" for k, v in values.items())
     tmp = path.with_suffix(".tmp")
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
@@ -85,6 +126,26 @@ def write_env(values: dict[str, str]) -> Path:
     os.replace(tmp, path)
     path.chmod(0o600)
     return path
+
+
+def delete_secret(name: str) -> bool:
+    """Remove a value from the .env and/or the keyring. Returns whether anything was removed."""
+    from core import keystore
+
+    values = _read_env_file()
+    items = set(keyring_items(values))
+    removed = values.pop(name, None) is not None
+    if name in items:
+        items.discard(name)
+        removed = keystore.delete(name) or removed
+    if items:
+        values[keystore.ITEMS_VAR] = ",".join(sorted(items))
+    else:
+        values.pop(keystore.ITEMS_VAR, None)
+    if removed:
+        _write_file(values)
+        os.environ.pop(name, None)
+    return removed
 
 
 def is_private(path: Path) -> bool:
