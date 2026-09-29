@@ -155,7 +155,36 @@ def cmd_serve(args) -> int:
     import uvicorn
 
     print(theme.banner(__version__, sys.stderr), end="", file=sys.stderr)
+    print(f"Dashboard: {_dashboard_url(host, port)}   (open it signed in with `harness dashboard`)", file=sys.stderr)
     uvicorn.run("core.gateway.api:app", host=host, port=port, log_level=args.log_level)
+    return 0
+
+
+def _dashboard_url(host: str, port: int) -> str:
+    shown = "127.0.0.1" if host in {"0.0.0.0", "::", ""} else host
+    return f"http://{'[' + shown + ']' if ':' in shown else shown}:{port}/ui"
+
+
+def cmd_dashboard(args) -> int:
+    """Open the web dashboard, signed in: the token travels in the URL fragment, which is never sent to a server."""
+    load_env()
+    from core.settings import settings
+
+    st = settings()
+    token = os.environ.get("HARNESS_API_TOKEN")
+    if not token:
+        print("No API token configured. Run `harness init`.", file=sys.stderr)
+        return 1
+    url = _dashboard_url(args.host or st.api_host, args.port or st.api_port)
+    if args.print_url:
+        print(url)
+        return 0
+    import webbrowser
+
+    if not webbrowser.open(f"{url}#token={token}"):
+        print(f"Open {url} and paste the token from `harness token`.")
+    else:
+        print(f"Opened {url} (start the server with `harness serve` if it is not running).")
     return 0
 
 
@@ -227,6 +256,18 @@ def cmd_run(args) -> int:
         print(f"\n{theme.glyph('receipt', sys.stderr)} {theme.status_mark('ok' if ok else 'fail', sys.stderr)} "
               f"{theme.paint(str(receipt.status), 'accent', sys.stderr)}  {_usage_line(receipt.usage)}", file=sys.stderr)
     return res["exit_code"]
+
+
+def cmd_chat(args) -> int:
+    load_env()
+    ensure_home()
+    if args.max_cost:
+        os.environ["HARNESS_MAX_COST_USD"] = str(args.max_cost)
+    from cli.chat import Chat, enable_history
+
+    if sys.stdin.isatty():
+        enable_history()
+    return Chat(agent_id=args.agent, mode=args.mode, model=args.model, resume=args.resume).run()
 
 
 def cmd_doctor(args) -> int:
@@ -420,6 +461,20 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--mode", choices=["default", "plan", "read-only", "strict"],
                    help="permission mode: plan = read-only until you approve the plan")
     r.set_defaults(fn=cmd_run)
+
+    db = sub.add_parser("dashboard", help="open the web dashboard (served by `harness serve` at /ui)")
+    db.add_argument("--host")
+    db.add_argument("--port", type=int)
+    db.add_argument("--print-url", action="store_true", help="print the URL (without the token) instead of opening it")
+    db.set_defaults(fn=cmd_dashboard)
+
+    ch = sub.add_parser("chat", help="interactive multi-turn session (approvals inline, /help for commands)")
+    ch.add_argument("--agent", default="devops_agent")
+    ch.add_argument("--mode", choices=["default", "plan", "read-only", "strict"])
+    ch.add_argument("--model")
+    ch.add_argument("--max-cost", type=float, metavar="USD")
+    ch.add_argument("--resume", metavar="SESSION_ID")
+    ch.set_defaults(fn=cmd_chat)
 
     d = sub.add_parser("doctor", help="check the installation and print fixes")
     d.add_argument("--online", action="store_true", help="also make a tiny model call")

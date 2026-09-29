@@ -91,6 +91,8 @@ class TestAuth:
             path = getattr(route, "path", "")
             if path in {"/health", "/openapi.json", "/docs", "/docs/oauth2-redirect", "/redoc"} or not path:
                 continue
+            if path in {"/", "/ui", "/ui/", "/ui/{name}"}:     # static dashboard code; its data calls need the token
+                continue
             for method in getattr(route, "methods", set()) - {"HEAD", "OPTIONS"}:
                 url = path.replace("{session_id}", "x").replace("{agent_id}", "x").replace("{job_id}", "x") \
                     .replace("{approval_id}", "x").replace("{action}", "pause")

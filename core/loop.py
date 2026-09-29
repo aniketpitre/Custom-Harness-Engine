@@ -16,6 +16,7 @@ from core.compaction import apply_pruned, estimate_tokens, needs_compaction, pla
 from core.engine import Engine, expand_capabilities, get_engine
 from core.llm import ContextOverflow, LLMError, ToolCall, complete, simple_completion
 from core.memory.store import init_db, record_memory_use
+from core.modes import NOTES as MODE_NOTES
 from core.modes import READ_ONLY_MODES, default_mode
 from core.modes import normalize as normalize_mode
 from core.policy import parse_rule
@@ -202,11 +203,7 @@ async def run_agent_generator(
         _seed_history(sink, initial_history)
     pairs = sink.pairs()
     if not pairs or pairs[-1][1]["role"] == "assistant":
-        note = {"plan": "\n\n[Plan mode] You can only use read-only tools. Investigate, then call exit_plan_mode "
-                        "with a concrete plan; you may make changes only after it is approved.",
-                "read-only": "\n\n[Read-only mode] Only read-only tools are available. Report findings and "
-                             "recommendations; do not attempt changes."}.get(ctx.mode, "")
-        sink.append("user_msg", {"content": build_prompt(context) + note})
+        sink.append("user_msg", {"content": build_prompt(context) + MODE_NOTES.get(ctx.mode, "")})
         hits = [h["id"] for h in context.memory_hits if "id" in h]
         if hits:
             use_conn = init_db(st.db_path)

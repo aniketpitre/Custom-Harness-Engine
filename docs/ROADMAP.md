@@ -16,12 +16,12 @@ Treat the "others" column as a good-faith snapshot, not a certified comparison.
 | Approvals | Terminal, API and Telegram at once, first answer wins | Claude Code: terminal only; OpenClaw: chat channels | **On par**, Slack missing |
 | Verification | Verifier registry, independent verifier agent | Rare elsewhere | **Ahead** |
 | DevOps depth | kubectl, ArgoCD, GitOps via worktree, protected namespaces | HolmesGPT: 30+ observability toolsets, alert-triggered investigation, runbooks | **Behind** on breadth (observability) |
-| Interactive use | One-shot `harness run`, API + SSE | Claude Code, Hermes, OpenClaw: full interactive TUI/REPL | **Behind** |
+| Interactive use | `harness chat` (multi-turn, inline approvals, slash commands, resume), `harness run`, API + SSE | Claude Code, Hermes, OpenClaw: full interactive TUI/REPL | **Behind** |
 | Channels | Telegram, terminal, API | OpenClaw: 20+ channels; Hermes: messaging platforms | **Behind** (Slack/Teams matter most for DevOps) |
 | Cost | Per-call USD in the event log, USD budget, `harness cost`, `GET /usage`, cost in receipts and session lists | Claude Code `/cost` and status line; OpenClaw usage tracking | **On par** |
 | MCP | Client, stdio transport only | Remote (HTTP) servers with OAuth; agents that are themselves MCP servers | **Behind** |
 | Extension packaging | In-tree plugins, `SKILL.md` skills | Claude Code plugins bundle skills, subagents, hooks, MCP; Agent Skills is now an open format with 46+ adopting products | **Behind** on distribution |
-| Web UI | None | OpenClaw Control UI | **Behind** |
+| Web UI | Dashboard at `/ui`: sessions with live timelines, approvals, usage, schedules, agents, plugins | OpenClaw Control UI | **Behind** |
 | Observability | OTLP spans | OpenTelemetry GenAI semantic conventions (`gen_ai.*` attributes) | **Partial**: spans exist, standard attribute names not adopted |
 | Supply chain | Gitleaks in CI, AST allowlist for dynamic tools | Signed artefacts, SBOM, provenance, dependency updates | **Partial** (this change adds SBOM/provenance and Dependabot) |
 | CLI experience | Themed CLI (this change) | Hermes: 10 built-in skins and YAML skins; OpenClaw: lobster identity | **On par** after this change |
@@ -42,7 +42,7 @@ inherit any key they omit, like Hermes skins. Styling appears only on an interac
 | # | Item | Why | Size |
 |---|---|---|---|
 | E1.1 | **Done.** Cost accounting: per-call, per-session and per-agent USD from LiteLLM's price map, a `max_cost_usd` budget, `harness sessions` shows cost, cost in receipts | Every reference agent shows cost; teams need a spend ceiling | S |
-| E1.2 | `harness chat`: interactive REPL on the existing engine (streaming, `/rewind`, `/cost`, `/theme`, `/approve`), themed status line | Biggest usability gap versus Claude Code, Hermes and OpenClaw | M |
+| E1.2 | **Done.** `harness chat` (`cli/chat.py`): interactive REPL on the existing engine (streaming, `/rewind`, `/cost`, `/theme`, `/approve`), themed status line | Biggest usability gap versus Claude Code, Hermes and OpenClaw | M |
 | E1.3 | **Done.** Permission modes (`core/modes.py`; `accept-edits` dropped because workspace edits are already R1 and run without asking): `plan` (read-only until the plan is approved), `read-only`, `strict` | Familiar mental model; maps onto the existing tiers, so small | S |
 | E1.4 | **Done.** Headless contract (`core/headless.py`, `action.yml`): `--output-format json|stream-json`, `--max-cost`, stable exit codes, a reusable GitHub Action | CI use is a headline use case for DevOps | S |
 | E1.5 | OpenTelemetry GenAI conventions: `gen_ai.operation.name`, `gen_ai.request.model`, `gen_ai.usage.*`, tool spans | Lets any OTel backend read our traces unchanged | S |
@@ -65,7 +65,7 @@ inherit any key they omit, like Hermes skins. Styling appears only on an interac
 | E3.1 | MCP: streamable HTTP client with OAuth, per-server allowlist and pinning, `harness mcp serve` (expose the harness as an MCP server) | Also closes the supply-chain gap for MCP servers |
 | E3.2 | Installable plugin packages (Python entry points) and a bundle format for skills, hooks, MCP config | Claude Code plugin model; Agent Skills format compatibility check |
 | E3.3 | Managed policy file that user config cannot loosen (org-wide deny rules) | Enterprise requirement |
-| E3.4 | Web control UI (sessions, approvals, live SSE, receipts) | The API already exposes everything it needs |
+| E3.4 | **Done.** Web dashboard (`core/ui/`, `/ui`) (sessions, approvals, live SSE, receipts) | The API already exposes everything it needs |
 | E3.5 | A2A agent card so other agents can call this one | Low priority; A2A v1.0 is stable |
 
 ### E4: hardening and hygiene

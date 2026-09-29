@@ -125,6 +125,42 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Harness Engine Control Plane API", lifespan=lifespan)
 
 
+# -- dashboard ---------------------------------------------------------------------------
+_UI_DIR = __import__("pathlib").Path(__file__).resolve().parent.parent / "ui"
+_UI_FILES = {"": ("index.html", "text/html; charset=utf-8"), "app.js": ("app.js", "text/javascript; charset=utf-8"),
+             "app.css": ("app.css", "text/css; charset=utf-8")}
+_UI_HEADERS = {
+    # no inline script, no third-party origins, no framing: the page only talks to this API
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                               "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; "
+                               "form-action 'self'",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "no-cache",
+}
+
+
+@app.get("/ui", include_in_schema=False)
+@app.get("/ui/", include_in_schema=False)
+@app.get("/ui/{name}", include_in_schema=False)
+def dashboard(name: str = ""):
+    """The web dashboard. The page itself is public static code; every data call needs the API token."""
+    from fastapi.responses import Response
+
+    entry = _UI_FILES.get(name)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    body = (_UI_DIR / entry[0]).read_bytes()
+    return Response(body, media_type=entry[1], headers=_UI_HEADERS)
+
+
+@app.get("/", include_in_schema=False)
+def root():
+    from fastapi.responses import RedirectResponse
+
+    return RedirectResponse("/ui")
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}

@@ -19,6 +19,14 @@ MODES = ("default", "plan", "read-only", "strict")
 READ_ONLY_MODES = {"plan", "read-only"}
 
 
+NOTES = {
+    "plan": "\n\n[Plan mode] You can only use read-only tools. Investigate, then call exit_plan_mode with a "
+            "concrete plan; you may make changes only after it is approved.",
+    "read-only": "\n\n[Read-only mode] Only read-only tools are available. Report findings and recommendations; "
+                 "do not attempt changes.",
+}
+
+
 def normalize(mode: str | None) -> str | None:
     if not mode:
         return None

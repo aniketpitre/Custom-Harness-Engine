@@ -10,7 +10,7 @@ import pytest
 
 from cli import doctor
 from cli.main import build_parser, main
-from core import home
+from core import __version__, home
 from tests.helpers import install_llm, msg
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -289,7 +289,7 @@ class TestServeRunAndFriends:
         assert main(["plugins"]) == 0
         out = capsys.readouterr().out
         assert "fs" in out and "ACTIVE" in out and "FAILED" not in out
-        assert main(["version"]) == 0 and "harness-engine 0.2.0" in capsys.readouterr().out
+        assert main(["version"]) == 0 and f"harness-engine {__version__}" in capsys.readouterr().out
 
     def test_every_subcommand_is_documented_in_help(self):
         parser = build_parser()
@@ -341,7 +341,7 @@ class TestWheel:
         cwd.mkdir()
         run = lambda *a: subprocess.run([sys.executable, "-m", "cli", *a], cwd=cwd, env=env, capture_output=True, text=True)  # noqa: E731
         ver = run("version")
-        assert ver.returncode == 0 and "0.2.0" in ver.stdout
+        assert ver.returncode == 0 and __version__ in ver.stdout
         init = run("init", "-y", "--provider", "groq", "--api-key", "k")
         assert init.returncode == 0, init.stderr
         doc = run("doctor", "--json")

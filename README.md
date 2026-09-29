@@ -409,7 +409,9 @@ needs Python 3.11+ or `uv`):
 curl -fsSL https://raw.githubusercontent.com/aniketpitre/Custom-Harness-Engine/main/install.sh | sh
 harness init        # ~1 minute: provider, model, API key, generates the API token, optional Telegram
 harness doctor      # checks the install and prints the exact fix for anything missing
-harness serve       # API on 127.0.0.1:8000
+harness chat        # interactive session in the terminal
+harness serve       # API + web dashboard on 127.0.0.1:8000
+harness dashboard   # open the dashboard, signed in
 harness run "List the files in the workspace"
 ```
 
@@ -427,13 +429,15 @@ No Vault, Docker or database server is required; Vault is an optional secrets pr
 | `harness init` | First-run setup; idempotent (keeps your token and edited agents). `-y` with flags for scripts/CI: `--provider --model --api-key-env VAR --telegram-bot-token-env VAR ...` |
 | `harness doctor [--online] [--json]` | Checks Python, permissions (`.env` must be 600), token, model key, agents, database, `git`/`gh`/`kubectl`/`argocd`/`bwrap`, optional Python extras, port; `--online` makes a tiny model call. Exit code 1 on failures |
 | `harness serve [--host --port]` | Start the API (refuses to start without a token; warns on non-loopback binds) |
-| `harness run GOAL [--agent] [--verify-file PATH TEXT]` | One-shot run; prints the receipt JSON; exit code reflects success |
+| `harness chat [--agent --mode --model --max-cost --resume ID]` | Interactive multi-turn session: approvals inline, Ctrl+C stops a turn, `/help`, `/cost`, `/mode`, `/model`, `/tools`, `/theme`, `/new`. The whole chat is one durable, resumable session |
+| `harness dashboard [--print-url]` | Open the web dashboard served by `harness serve`, already signed in |
+| `harness run GOAL [--agent --mode --max-cost --output-format --approval-timeout --summary-file]` | One-shot, headless-friendly run (see [Headless and CI](#headless-and-ci)); stable exit codes |
 | `harness token` | Print the API token (for `curl`) |
 | `harness theme list\|show\|set NAME` | Terminal theme: `helm` (default), `harbor`, `ember`, `forest`, `midnight`, `mono`, or your own `~/.harness/skins/NAME.yaml` |
 | `harness secret list\|set NAME\|delete NAME` | Manage secrets in the OS keyring (macOS Keychain, Windows Credential Locker, Secret Service/KWallet); values are never printed |
 | `harness sessions [ID]` | Recent sessions (with cost) / one session |
 | `harness cost [--days N] [--by model\|agent\|day\|session] [--json]` | Tokens and USD spent, from the event log (subagents included) |
-| `harness approvals list|approve|deny ID` | Manage approvals on a running server |
+| `harness approvals list\|approve\|deny ID` | Manage approvals on a running server |
 | `harness plugins` | Plugin states and tools |
 
 ```bash
@@ -540,6 +544,26 @@ glyphs: {mascot: "🐝"}
 
 Styling shows only on an interactive terminal; piped output, `--json` and receipts stay plain. `NO_COLOR`,
 `HARNESS_ASCII=1` (no emoji) and `HARNESS_PLAIN=1` are honoured.
+
+## Web dashboard
+
+`harness serve` also serves a dashboard at `http://127.0.0.1:8000/ui` (`harness dashboard` opens it signed in).
+It has no build step and no third-party code: three static files in `core/ui/`, served with a strict
+Content-Security-Policy, talking only to the same API with your token.
+
+| Page | What you can do |
+|---|---|
+| Overview | Running sessions, success rate, 30-day spend, pending approvals, daily spend chart, recent sessions |
+| Sessions | Filter by status/agent (optionally subagents); open one for its live event timeline (messages, tool calls with policy decision and risk tier, model calls with cost, mode changes, verification), summary, final answer, **inline approvals**, a note to steer the run, cancel, fork, verify the hash chain |
+| New run | Pick an agent, write the goal, choose the permission mode |
+| Approvals | Everything waiting for a human, with scope and a note; first answer from any channel wins |
+| Usage & cost | Spend by day, model and agent for 7/30/90 days, unpriced calls flagged |
+| Schedules · Skills · Agents · Plugins | Cron jobs (add, pause, delete), installed skills, agent profiles and limits, plugin state and reload |
+
+Light and dark themes follow the OS (or a toggle), the layout works on a phone, and agent output is always rendered
+as text, never as HTML. The token lives in the tab's session storage unless you tick "remember".
+
+![Dashboard overview](docs/images/dashboard-overview.png)
 
 ## Headless and CI
 

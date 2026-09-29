@@ -44,7 +44,7 @@ include = ["core*", "domains*", "receipts*", "cli*"]
 
 [tool.setuptools.package-data]
 "domains.devops" = ["skills/*/SKILL.md"]
-"core" = ["defaults/*"]
+"core" = ["defaults/*", "ui/*"]
 
 [tool.ruff]
 line-length = 120
