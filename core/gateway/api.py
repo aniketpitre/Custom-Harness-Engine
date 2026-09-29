@@ -102,13 +102,16 @@ verify_token = authenticate  # backwards-compatible name
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _telegram
-    from core.gateway.channels import start_telegram
+    from core.gateway.channels import start_telegram, terminal_channel
 
     await engine.ensure_started()
     runs.recover()
     start_scheduler(runs)
     _telegram = start_telegram(engine.broker)
+    terminal = terminal_channel(engine.broker)      # live prompt when `harness serve` runs in a terminal
     yield
+    if terminal:
+        terminal()
     for sid in list(runs.active_ids()):
         runs.cancel(sid)
     if _telegram:

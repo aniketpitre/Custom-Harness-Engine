@@ -71,7 +71,7 @@ user. Each point below is something the code enforces and the test suite checks 
 - Risk tiers **R0-R4**, deny-by-default, argument-aware risk functions, hard blocklist
 - Rules: `deny > ask > allow` with argument patterns (`deny:bash(git push --force*)`)
 - Taint tracking after untrusted content
-- Approval broker: Telegram buttons, REST API, terminal prompt; approver allowlist; timeout → deny
+- Approval broker: live terminal prompt (in `harness serve` and `harness run` when stdin is a TTY, opt out with `HARNESS_TERMINAL_APPROVALS=off`), REST API and Telegram buttons all active at once, first answer wins, prompts asked one at a time; approver allowlist; timeout → deny
 - Workspace confinement (symlink-safe, deny list for `.ssh`, `.aws`, `.kube`, `.env`, `secrets`), engine-source write protection
 - SSRF guard on every redirect hop; secret-stripped environments for all child processes
 - Shell command classifier (read-only pipelines auto-run, mutations ask, destructive commands are blocked) with optional `bwrap`/Docker sandbox

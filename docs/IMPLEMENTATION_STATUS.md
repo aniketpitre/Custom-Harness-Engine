@@ -70,3 +70,5 @@ C7 persistent cron, heartbeat, list/pause/delete - done. C8 `AGENTS.md` - done.
 - SSRF checks resolve DNS before connecting; a DNS-rebinding race between check and connect is not pinned.
 - No cost accounting (tokens only) and no multi-channel chat gateway.
 - Docker and the live tests could not be exercised in the build environment; compose/Dockerfile are validated statically.
+
+| Approvals with no setup: terminal prompt in `harness serve`/`run`, chained with API and Telegram (first answer wins) | Done: `core/gateway/channels.py`, `tests/test_terminal_approvals.py` |

@@ -136,7 +136,7 @@ def collect(online: bool = False, port: int | None = None) -> list[Check]:
 
     telegram_ready = bool(os.environ.get("HARNESS_SECRET_TELEGRAM_BOT_TOKEN") and os.environ.get("HARNESS_SECRET_TELEGRAM_APPROVAL_CHAT_ID"))
     checks.append(Check("approvals", OK if telegram_ready else WARN,
-                        "Telegram configured" if telegram_ready else "using terminal / API approvals (no Telegram)",
+                        "Telegram configured" if telegram_ready else "terminal prompt (when serving in a terminal) + API /approvals; no Telegram",
                         "" if telegram_ready else "optional: `harness init` can configure Telegram"))
 
     p = port or st.api_port

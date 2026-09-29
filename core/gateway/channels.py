@@ -26,18 +26,46 @@ def start_telegram(broker: ApprovalBroker) -> TelegramChannel | None:
     return channel
 
 
-def terminal_channel(broker: ApprovalBroker):
-    """Prompt on the terminal (only when stdin is a TTY). Returns the disposer, or None."""
-    if not sys.stdin.isatty():
+def terminal_enabled() -> bool:
+    """A live prompt is offered when stdin is a TTY, unless HARNESS_TERMINAL_APPROVALS turns it off."""
+    import os
+
+    if os.getenv("HARNESS_TERMINAL_APPROVALS", "").strip().lower() in {"0", "false", "no", "off"}:
+        return False
+    try:
+        return sys.stdin is not None and sys.stdin.isatty()
+    except (ValueError, OSError):
+        return False
+
+
+def _pending(broker: ApprovalBroker, req_id: str) -> bool:
+    return any(p["id"] == req_id for p in broker.pending())
+
+
+def terminal_channel(broker: ApprovalBroker, force: bool = False):
+    """Prompt on the terminal, one request at a time; the first answer from any channel
+    (terminal, API, Telegram) wins and a request answered elsewhere is skipped.
+    Returns the disposer, or None when there is no terminal to ask on."""
+    if not force and not terminal_enabled():
         return None
+    lock = asyncio.Lock()
 
     async def notify(req: ApprovalRequest) -> None:
         async def ask() -> None:
-            print(f"\n[approval {req.risk_tier}] {req.tool}\n{req.rendered}\n", file=sys.stderr)
-            answer = await asyncio.to_thread(input, "Approve? [y]es / [s]ession / [N]o: ")
-            a = answer.strip().lower()
-            broker.resolve(req.id, a in {"y", "yes", "s", "session"}, "cli:terminal",
-                           "session" if a in {"s", "session"} else "once")
+            async with lock:
+                if not _pending(broker, req.id):        # answered elsewhere while queued
+                    return
+                print(f"\n[approval needed: {req.risk_tier}] {req.tool}\n{req.rendered}\n"
+                      f"(you can also answer via the API or Telegram)", file=sys.stderr, flush=True)
+                try:
+                    answer = await asyncio.to_thread(input, "Approve? [y]es / [s]ession / [N]o: ")
+                except EOFError:
+                    return
+                if not _pending(broker, req.id):
+                    return
+                a = answer.strip().lower()
+                broker.resolve(req.id, a in {"y", "yes", "s", "session"}, "cli:terminal",
+                               "session" if a in {"s", "session"} else "once")
 
         asyncio.get_running_loop().create_task(ask())
 

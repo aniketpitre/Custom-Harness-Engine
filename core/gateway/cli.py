@@ -36,7 +36,7 @@ async def handle_cli_input(
     finally:
         conn.close()
     channel = start_telegram(engine.broker)
-    terminal = terminal_channel(engine.broker) if channel is None else None
+    terminal = terminal_channel(engine.broker)
     try:
         await runs.run_inline(session_id)
     finally:
