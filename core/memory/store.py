@@ -139,6 +139,9 @@ _ADD_COLUMNS = {
         "outcome": "TEXT",
         "verified": "INTEGER",
         "verification": "JSON",
+        "prompt_tokens": "INTEGER",
+        "completion_tokens": "INTEGER",
+        "cost_usd": "REAL",
     },
     "memory_entries": {"superseded_by": "TEXT"},
 }
@@ -329,6 +332,9 @@ def _session_row(row) -> dict:
         "verification": json.loads(row["verification"]) if "verification" in keys and row["verification"] else None,
         "verified": (None if row["verified"] is None else bool(row["verified"]))
         if "verified" in keys else None,
+        "prompt_tokens": row["prompt_tokens"] if "prompt_tokens" in keys else None,
+        "completion_tokens": row["completion_tokens"] if "completion_tokens" in keys else None,
+        "cost_usd": row["cost_usd"] if "cost_usd" in keys else None,
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }
@@ -350,9 +356,13 @@ def update_session(
     *,
     outcome: str | None = None,
     verified=_UNSET,
+    usage: dict | None = None,
 ) -> None:
     """Update status. The stored receipt is only touched when `run_receipt` is passed."""
     sets, params = ["status = ?", "updated_at = ?"], [status, _now()]
+    if usage:
+        sets += ["prompt_tokens = ?", "completion_tokens = ?", "cost_usd = ?"]
+        params += [usage.get("prompt"), usage.get("completion"), usage.get("cost_usd")]
     if run_receipt is not _UNSET:
         sets.append("run_receipt = ?")
         params.append(json.dumps(run_receipt) if run_receipt is not None else None)
@@ -398,3 +408,24 @@ def get_and_clear_interruption(conn, session_id: str) -> str | None:
 
     pending = drain_interrupts(conn, session_id)
     return "\n".join(pending) if pending else None
+
+
+def usage_summary(conn, since: str | None = None, group_by: str = "model", limit: int = 50) -> list[dict]:
+    """Tokens and USD per model, agent or day, computed from `llm_call` events (subagents included)."""
+    key = {"model": "json_extract(e.payload, '$.model')", "agent": "s.agent_id",
+           "day": "substr(e.created_at, 1, 10)", "session": "e.session_id"}[group_by]
+    where, params = "e.type = 'llm_call'", []
+    if since:
+        where += " AND e.created_at >= ?"
+        params.append(since)
+    rows = conn.execute(
+        f"""SELECT {key} AS k, COUNT(*) AS calls,
+                   SUM(json_extract(e.payload, '$.prompt_tokens')) AS prompt_tokens,
+                   SUM(json_extract(e.payload, '$.completion_tokens')) AS completion_tokens,
+                   SUM(COALESCE(json_extract(e.payload, '$.cost_usd'), 0)) AS cost_usd,
+                   SUM(json_extract(e.payload, '$.cost_usd') IS NULL) AS unpriced_calls
+            FROM events e LEFT JOIN sessions s ON s.id = e.session_id
+            WHERE {where} GROUP BY k ORDER BY cost_usd DESC, k LIMIT ?""", (*params, limit)).fetchall()
+    return [{"key": r["k"], "calls": r["calls"], "prompt_tokens": r["prompt_tokens"] or 0,
+             "completion_tokens": r["completion_tokens"] or 0, "cost_usd": round(r["cost_usd"] or 0, 6),
+             "unpriced_calls": r["unpriced_calls"] or 0} for r in rows]

@@ -68,6 +68,7 @@ class Settings:
     workspace: Path = field(default_factory=Path.cwd)
     max_turns: int = 30
     token_budget: int = 200_000
+    max_cost_usd: float = 0.0
     max_seconds: int = 3600
     context_window: int = 128_000
     reserve_tokens: int = 16_384
@@ -153,6 +154,7 @@ def settings() -> Settings:
         workspace=Path(os.getenv("HARNESS_WORKSPACE", str(Path.cwd()))).resolve(),
         max_turns=_int("HARNESS_MAX_TURNS", 30),
         token_budget=_int("HARNESS_TOKEN_BUDGET", 200_000),
+        max_cost_usd=_float("HARNESS_MAX_COST_USD", float(cfg.get("max_cost_usd") or 0)),
         max_seconds=_int("HARNESS_MAX_SECONDS", 3600),
         context_window=_int("HARNESS_CONTEXT_WINDOW", 128_000),
         reserve_tokens=_int("HARNESS_RESERVE_TOKENS", 16_384),

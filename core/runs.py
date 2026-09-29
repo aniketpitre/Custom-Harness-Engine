@@ -199,10 +199,11 @@ class RunManager:
             receipt = build_receipt(conn, session_id, goal, profile.id, model_used=r["model_used"],
                                     final_text=r["final_text"], outcome=r["outcome"],
                                     verification=r["verification"], started_at=goal.created_at,
-                                    teardown_tasks=r["teardown_tasks"])
+                                    teardown_tasks=r["teardown_tasks"], usage=r.get("usage"))
             self._record_skill_outcomes(conn, session_id, r)
             data = receipt_json(receipt)
-            update_session(conn, session_id, receipt.status, data, outcome=r["outcome"], verified=r["verified"])
+            update_session(conn, session_id, receipt.status, data, outcome=r["outcome"], verified=r["verified"],
+                           usage=r.get("usage"))
             spawn(dispatch_webhook(session_id, receipt.status, data))
         finally:
             conn.close()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import random
 from dataclasses import dataclass, field
 from typing import Any, Callable
@@ -12,6 +13,8 @@ from core.secrets import get_llm_key
 from core.settings import Settings
 
 log = logging.getLogger("harness.llm")
+# use the price/model map bundled with LiteLLM instead of fetching it over the network on import
+os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
 _sleep = asyncio.sleep  # patched in tests
 
 
@@ -41,6 +44,12 @@ class Completion:
     @property
     def total_tokens(self) -> int:
         return self.prompt_tokens + self.completion_tokens
+
+    @property
+    def cost_usd(self) -> float | None:
+        from core.cost import cost_usd
+
+        return cost_usd(self.model, self.prompt_tokens, self.completion_tokens)
 
 
 def _get(obj: Any, name: str, default: Any = None) -> Any:

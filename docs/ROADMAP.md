@@ -18,7 +18,7 @@ Treat the "others" column as a good-faith snapshot, not a certified comparison.
 | DevOps depth | kubectl, ArgoCD, GitOps via worktree, protected namespaces | HolmesGPT: 30+ observability toolsets, alert-triggered investigation, runbooks | **Behind** on breadth (observability) |
 | Interactive use | One-shot `harness run`, API + SSE | Claude Code, Hermes, OpenClaw: full interactive TUI/REPL | **Behind** |
 | Channels | Telegram, terminal, API | OpenClaw: 20+ channels; Hermes: messaging platforms | **Behind** (Slack/Teams matter most for DevOps) |
-| Cost | Token counts and token budget only | Claude Code `/cost` and status line; OpenClaw usage tracking | **Behind** |
+| Cost | Per-call USD in the event log, USD budget, `harness cost`, `GET /usage`, cost in receipts and session lists | Claude Code `/cost` and status line; OpenClaw usage tracking | **On par** |
 | MCP | Client, stdio transport only | Remote (HTTP) servers with OAuth; agents that are themselves MCP servers | **Behind** |
 | Extension packaging | In-tree plugins, `SKILL.md` skills | Claude Code plugins bundle skills, subagents, hooks, MCP; Agent Skills is now an open format with 46+ adopting products | **Behind** on distribution |
 | Web UI | None | OpenClaw Control UI | **Behind** |
@@ -41,7 +41,7 @@ inherit any key they omit, like Hermes skins. Styling appears only on an interac
 
 | # | Item | Why | Size |
 |---|---|---|---|
-| E1.1 | Cost accounting: per-call, per-session and per-agent USD from LiteLLM's price map, a `max_cost_usd` budget, `harness sessions` shows cost, cost in receipts | Every reference agent shows cost; teams need a spend ceiling | S |
+| E1.1 | **Done.** Cost accounting: per-call, per-session and per-agent USD from LiteLLM's price map, a `max_cost_usd` budget, `harness sessions` shows cost, cost in receipts | Every reference agent shows cost; teams need a spend ceiling | S |
 | E1.2 | `harness chat`: interactive REPL on the existing engine (streaming, `/rewind`, `/cost`, `/theme`, `/approve`), themed status line | Biggest usability gap versus Claude Code, Hermes and OpenClaw | M |
 | E1.3 | Permission modes: `plan` (read-only until the plan is approved), `accept-edits`, `strict` | Familiar mental model; maps onto the existing tiers, so small | S |
 | E1.4 | Headless contract: `--output-format json|stream-json`, `--max-cost`, stable exit codes, a reusable GitHub Action | CI use is a headline use case for DevOps | S |

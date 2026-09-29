@@ -44,3 +44,4 @@ class RunReceipt(BaseModel):
     started_at: datetime
     finished_at: datetime | None = None
     teardown_tasks: list[str] = Field(default_factory=list)
+    usage: dict[str, object] | None = None  # prompt/completion tokens, turns, cost_usd, unpriced_calls

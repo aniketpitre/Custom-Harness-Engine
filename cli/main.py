@@ -159,9 +159,21 @@ def cmd_serve(args) -> int:
     return 0
 
 
+def _usage_line(usage: dict | None) -> str:
+    from core.cost import fmt
+
+    if not usage:
+        return ""
+    tokens = (usage.get("prompt") or 0) + (usage.get("completion") or 0)
+    extra = f", {usage['unpriced_calls']} unpriced call(s)" if usage.get("unpriced_calls") else ""
+    return f"{tokens:,} tokens, {fmt(usage.get('cost_usd'))}{extra}"
+
+
 def cmd_run(args) -> int:
     load_env()
     ensure_home()
+    if getattr(args, "max_cost", None):
+        os.environ["HARNESS_MAX_COST_USD"] = str(args.max_cost)
     from core.gateway.cli import handle_cli_input
 
     verification = ({"type": "file_content", "path": args.verify_file[0], "expected_content": args.verify_file[1]}
@@ -171,7 +183,7 @@ def cmd_run(args) -> int:
     if theme.styled(sys.stderr):
         ok = receipt.status == "success"
         print(f"\n{theme.glyph('receipt', sys.stderr)} {theme.status_mark('ok' if ok else 'fail', sys.stderr)} "
-              f"{theme.paint(str(receipt.status), 'accent', sys.stderr)}", file=sys.stderr)
+              f"{theme.paint(str(receipt.status), 'accent', sys.stderr)}  {_usage_line(receipt.usage)}", file=sys.stderr)
     return 0 if receipt.status == "success" else 1
 
 
@@ -196,14 +208,48 @@ def cmd_sessions(args) -> int:
                 return 1
             print(json.dumps(session, indent=2, default=str))
             return 0
-        rows = conn.execute("SELECT id, status, outcome, agent_id, goal, updated_at FROM sessions "
+        from core.cost import fmt
+
+        rows = conn.execute("SELECT id, status, outcome, agent_id, goal, cost_usd, updated_at FROM sessions "
                             "WHERE parent_session_id IS NULL ORDER BY updated_at DESC LIMIT ?", (args.limit,)).fetchall()
         for r in rows:
-            print(f"{r['id']}  {r['status']:<8} {(r['outcome'] or '-'):<17} {r['agent_id']:<14} {r['goal'][:60]}")
+            print(f"{r['id']}  {r['status']:<8} {(r['outcome'] or '-'):<17} {r['agent_id']:<14} "
+                  f"{fmt(r['cost_usd']):>9}  {r['goal'][:60]}")
         if not rows:
             print("no sessions yet")
     finally:
         conn.close()
+    return 0
+
+
+def cmd_cost(args) -> int:
+    load_env()
+    from datetime import datetime, timedelta, timezone
+
+    from core.cost import fmt
+    from core.memory.store import init_db, usage_summary
+
+    since = (datetime.now(timezone.utc) - timedelta(days=args.days)).isoformat()
+    conn = init_db()
+    try:
+        rows = usage_summary(conn, since=since, group_by=args.by)
+    finally:
+        conn.close()
+    if args.json:
+        print(json.dumps({"days": args.days, "by": args.by, "rows": rows}, indent=2))
+        return 0
+    if not rows:
+        print(f"no model calls in the last {args.days} day(s)")
+        return 0
+    print(f"{args.by:<42} {'calls':>6} {'input tok':>11} {'output tok':>11} {'cost':>10}")
+    for r in rows:
+        note = f"  ({r['unpriced_calls']} unpriced)" if r["unpriced_calls"] else ""
+        print(f"{str(r['key'])[:42]:<42} {r['calls']:>6} {r['prompt_tokens']:>11,} {r['completion_tokens']:>11,} "
+              f"{fmt(r['cost_usd']):>10}{note}")
+    total = sum(r["cost_usd"] for r in rows)
+    unpriced = sum(r["unpriced_calls"] for r in rows)
+    print(f"\n{theme.glyph('receipt')} total {fmt(total)} over {args.days} day(s)".replace("  ", " ")
+          + (f"; {unpriced} call(s) have no known price (set HARNESS_PRICES)" if unpriced else ""))
     return 0
 
 
@@ -320,6 +366,7 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("goal", nargs="+")
     r.add_argument("--agent", default="devops_agent")
     r.add_argument("--verify-file", nargs=2, metavar=("PATH", "EXPECTED"))
+    r.add_argument("--max-cost", type=float, metavar="USD", help="stop the run once it has spent this much")
     r.set_defaults(fn=cmd_run)
 
     d = sub.add_parser("doctor", help="check the installation and print fixes")
@@ -352,6 +399,12 @@ def build_parser() -> argparse.ArgumentParser:
     th.add_argument("action", choices=["list", "show", "set"], nargs="?", default="list")
     th.add_argument("name", nargs="?")
     th.set_defaults(fn=cmd_theme)
+
+    co = sub.add_parser("cost", help="token and USD usage from the event log")
+    co.add_argument("--days", type=int, default=30)
+    co.add_argument("--by", choices=["model", "agent", "day", "session"], default="model")
+    co.add_argument("--json", action="store_true")
+    co.set_defaults(fn=cmd_cost)
 
     sub.add_parser("plugins", help="list plugins and their state").set_defaults(fn=cmd_plugins)
     sub.add_parser("version").set_defaults(fn=cmd_version)

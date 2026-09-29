@@ -171,7 +171,8 @@ class TestAgentsAndSessions:
                     ids.append(cur)
                     events.append(json.loads(line[6:]))
         types = [e["type"] for e in events]
-        assert types[0] in {"tool_call", "message"} and "tool_result" in types and types[-1] == "final_receipt"
+        assert types[0] == "usage" and types[1] in {"tool_call", "message"}
+        assert "tool_result" in types and types[-1] == "final_receipt"
         assert ids == sorted(ids) and len(set(ids)) == len(ids)
         assert events[-1]["receipt"]["final_text"] == "streamed"
         # resume after the 2nd event: only later events are replayed

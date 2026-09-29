@@ -104,16 +104,33 @@ class Registry:
 
 @dataclass
 class Budget:
-    """Token budget shared between a run and its subagents."""
+    """Token and USD budget shared between a run and its subagents. `cost_limit` 0 means no USD limit."""
     limit: int
     used: int = 0
+    cost_limit: float = 0.0
+    cost_used: float = 0.0
+    unpriced_calls: int = 0
 
-    def add(self, tokens: int) -> None:
+    def add(self, tokens: int, cost: float | None = 0.0) -> None:
         self.used += max(tokens, 0)
+        if cost is None:
+            self.unpriced_calls += 1
+        else:
+            self.cost_used += max(cost, 0.0)
+
+    def charge(self, completion) -> None:
+        self.add(completion.total_tokens, completion.cost_usd)
+
+    @property
+    def cost_exhausted(self) -> bool:
+        return bool(self.cost_limit) and self.cost_used >= self.cost_limit
 
     @property
     def exhausted(self) -> bool:
-        return self.used >= self.limit
+        return self.used >= self.limit or self.cost_exhausted
+
+    def reason(self) -> str:
+        return "Cost budget exceeded" if self.cost_exhausted else "Token budget exceeded"
 
 
 @dataclass

@@ -18,6 +18,8 @@ Secrets come from the environment/`.env` first, then the OS keyring (`harness se
 | `HARNESS_STAGING_APPS` | ArgoCD app globs treated as staging (R2); all others are R3 | none |
 | `HARNESS_SANDBOX` | `none` / `bwrap` / `docker` for the bash tool (fails closed if unavailable) | `none` |
 | `HARNESS_TOKEN_BUDGET`, `HARNESS_MAX_TURNS`, `HARNESS_MAX_SECONDS` | Run limits | 200000 / 30 / 3600 |
+| `HARNESS_MAX_COST_USD` | USD ceiling per run, subagents included (also `max_cost_usd` per agent, `harness run --max-cost`); `0` = no limit | `0` |
+| `HARNESS_PRICES` | Price overrides, USD per million tokens: `{"my/model": {"input": 0.5, "output": 1.5}}`. Local models are free; models without a price are reported as *unpriced* | LiteLLM's bundled map |
 | `HARNESS_CONTEXT_WINDOW`, `HARNESS_KEEP_RECENT_TOKENS` | Compaction thresholds | 128000 / 20000 |
 | `HARNESS_RECEIPT_KEY` | HMAC key for the event-log hash chain | unset (plain SHA-256) |
 | `HARNESS_WEBHOOK_ENDPOINTS`, `HARNESS_WEBHOOK_SECRET` | Signed completion webhooks | none |

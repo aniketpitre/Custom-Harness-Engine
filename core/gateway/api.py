@@ -8,6 +8,7 @@ import time
 import uuid
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -189,6 +190,54 @@ def _require(session_id: str) -> dict:
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return session
+
+
+@app.get("/sessions", dependencies=[Depends(scope("sessions:read"))])
+def list_sessions(limit: int = 50, status: Optional[str] = None, agent_id: Optional[str] = None,
+                  include_children: bool = False):
+    """Recent sessions, newest first, with tokens and cost (no transcripts)."""
+    where, params = [], []
+    if not include_children:
+        where.append("parent_session_id IS NULL")
+    if status:
+        where.append("status = ?")
+        params.append(status)
+    if agent_id:
+        where.append("agent_id = ?")
+        params.append(agent_id)
+    sql = ("SELECT id, agent_id, goal, status, outcome, verified, parent_session_id, prompt_tokens, "
+           "completion_tokens, cost_usd, created_at, updated_at FROM sessions"
+           + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY updated_at DESC LIMIT ?")
+    conn = _conn()
+    try:
+        rows = [dict(r) for r in conn.execute(sql, (*params, max(1, min(limit, 500)))).fetchall()]
+    finally:
+        conn.close()
+    for r in rows:
+        r["verified"] = None if r["verified"] is None else bool(r["verified"])
+        r["active"] = runs.is_active(r["id"])
+    return rows
+
+
+@app.get("/usage", dependencies=[Depends(scope("sessions:read"))])
+def usage(days: int = 30, by: str = "model"):
+    """Tokens and USD from the event log, grouped by model, agent, day or session."""
+    from datetime import timedelta
+
+    from core.memory.store import usage_summary
+
+    if by not in {"model", "agent", "day", "session"}:
+        raise HTTPException(status_code=422, detail="by must be model, agent, day or session")
+    since = (datetime.now(timezone.utc) - timedelta(days=max(days, 1))).isoformat()
+    conn = _conn()
+    try:
+        rows = usage_summary(conn, since=since, group_by=by)
+    finally:
+        conn.close()
+    return {"days": days, "by": by, "rows": rows,
+            "total_cost_usd": round(sum(r["cost_usd"] for r in rows), 6),
+            "total_tokens": sum(r["prompt_tokens"] + r["completion_tokens"] for r in rows),
+            "unpriced_calls": sum(r["unpriced_calls"] for r in rows)}
 
 
 @app.get("/sessions/{session_id}", dependencies=[Depends(scope("sessions:read"))])

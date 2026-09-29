@@ -38,7 +38,8 @@ class RunState:
     final_text: str = ""
     model: str = ""
     error: str | None = None
-    usage: dict[str, int] = field(default_factory=lambda: {"prompt": 0, "completion": 0, "turns": 0})
+    usage: dict[str, Any] = field(default_factory=lambda: {"prompt": 0, "completion": 0, "turns": 0,
+                                                           "cost_usd": 0.0, "unpriced_calls": 0})
     started: float = field(default_factory=time.monotonic)
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -131,7 +132,7 @@ async def _flush_memory(engine, snapshot, ctx: RunCtx, messages: list[dict], mod
         res = await complete(models, messages + [prompt], [spec.schema()], st)
     except LLMError:
         return
-    ctx.budget.add(res.total_tokens)
+    ctx.budget.charge(res)
     for tc in res.tool_calls:
         args, err = _parse_args(tc)
         if not err and tc.name == "memory":
@@ -169,7 +170,8 @@ async def run_agent_generator(
         allowed=expand_capabilities(allowed_tools), settings=st, broker=engine.broker, hooks=engine.hooks,
         rules=[parse_rule(r) for r in (profile.rules if profile else [])],
         deny_tools=set(profile.deny_tools) if profile else set(),
-        budget=budget or Budget((profile.token_budget if profile and profile.token_budget else st.token_budget)),
+        budget=budget or Budget((profile.token_budget if profile and profile.token_budget else st.token_budget),
+                                cost_limit=(profile.max_cost_usd if profile and profile.max_cost_usd else st.max_cost_usd)),
         domain=domain, depth=depth, engine=engine, extras={"sink": sink, "context": context})
     max_turns = (profile.max_turns if profile and profile.max_turns else st.max_turns)
     snapshot = engine.snapshot()
@@ -251,8 +253,8 @@ async def run_agent_generator(
                 state.outcome, state.final_text = "turn_limit", "Execution stopped: turn limit reached"
                 break
             if ctx.budget.exhausted:
-                state.outcome, state.final_text = "budget_exhausted", "Execution blocked: Token budget exceeded"
-                yield {"type": "message", "content": "Token budget exceeded."}
+                state.outcome, state.final_text = "budget_exhausted", f"Execution blocked: {ctx.budget.reason()}"
+                yield {"type": "message", "content": f"{ctx.budget.reason()}."}
                 break
             if time.monotonic() - state.started > st.max_seconds:
                 state.outcome, state.final_text = "time_limit", "Execution stopped: time limit reached"
@@ -286,10 +288,20 @@ async def run_agent_generator(
                 break
             for piece in deltas:
                 yield {"type": "message_delta", "content": piece}
-            ctx.budget.add(result.total_tokens)
+            call_cost = result.cost_usd
+            ctx.budget.add(result.total_tokens, call_cost)
             last_prompt_tokens = result.prompt_tokens
             state.usage["prompt"] += result.prompt_tokens
             state.usage["completion"] += result.completion_tokens
+            if call_cost is None:
+                state.usage["unpriced_calls"] += 1
+            else:
+                state.usage["cost_usd"] = round(state.usage["cost_usd"] + call_cost, 8)
+            sink.append("llm_call", {"model": result.model or state.model, "prompt_tokens": result.prompt_tokens,
+                                     "completion_tokens": result.completion_tokens, "cost_usd": call_cost})
+            yield {"type": "usage", "model": result.model or state.model, "prompt_tokens": result.prompt_tokens,
+                   "completion_tokens": result.completion_tokens, "cost_usd": call_cost,
+                   "session_cost_usd": state.usage["cost_usd"]}
             state.model = result.model or state.model
             assistant = {"content": result.content}
             if result.tool_calls:
@@ -303,9 +315,9 @@ async def run_agent_generator(
                 # answer the pending calls so the transcript stays valid, then stop
                 for tc in result.tool_calls:
                     sink.append("tool_result", {"tool_call_id": tc.id, "is_error": True,
-                                                "content": "Not executed: token budget exceeded"})
-                state.outcome, state.final_text = "budget_exhausted", "Execution blocked: Token budget exceeded"
-                yield {"type": "message", "content": "Token budget exceeded."}
+                                                "content": f"Not executed: {ctx.budget.reason().lower()}"})
+                state.outcome, state.final_text = "budget_exhausted", f"Execution blocked: {ctx.budget.reason()}"
+                yield {"type": "message", "content": f"{ctx.budget.reason()}."}
                 break
             if not result.tool_calls:
                 hook = await engine.hooks.emit("stop", {"session_id": session_id, "final_text": result.content or ""})

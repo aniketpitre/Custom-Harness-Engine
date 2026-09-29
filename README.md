@@ -417,7 +417,8 @@ No Vault, Docker or database server is required; Vault is an optional secrets pr
 | `harness token` | Print the API token (for `curl`) |
 | `harness theme list\|show\|set NAME` | Terminal theme: `helm` (default), `harbor`, `ember`, `forest`, `midnight`, `mono`, or your own `~/.harness/skins/NAME.yaml` |
 | `harness secret list\|set NAME\|delete NAME` | Manage secrets in the OS keyring (macOS Keychain, Windows Credential Locker, Secret Service/KWallet); values are never printed |
-| `harness sessions [ID]` | Recent sessions / one session |
+| `harness sessions [ID]` | Recent sessions (with cost) / one session |
+| `harness cost [--days N] [--by model\|agent\|day\|session] [--json]` | Tokens and USD spent, from the event log (subagents included) |
 | `harness approvals list|approve|deny ID` | Manage approvals on a running server |
 | `harness plugins` | Plugin states and tools |
 
@@ -447,6 +448,8 @@ Config files are looked up in `$HARNESS_HOME/config/`, then `./config/` (checkou
 | `HARNESS_STAGING_APPS` | ArgoCD app globs treated as staging (R2); others are R3 | none |
 | `HARNESS_SANDBOX` | `none` / `bwrap` / `docker` for `bash` | `none` |
 | `HARNESS_TOKEN_BUDGET`, `HARNESS_MAX_TURNS`, `HARNESS_MAX_SECONDS` | Run limits | `200000` / `30` / `3600` |
+| `HARNESS_MAX_COST_USD` | USD ceiling per run, subagents included (also `max_cost_usd` per agent, `harness run --max-cost`); `0` = no limit | `0` |
+| `HARNESS_PRICES` | Price overrides, USD per million tokens: `{"my/model": {"input": 0.5, "output": 1.5}}`. Local models are free; models without a price are reported as *unpriced* | LiteLLM's bundled map |
 | `HARNESS_CONTEXT_WINDOW`, `HARNESS_RESERVE_TOKENS`, `HARNESS_KEEP_RECENT_TOKENS` | Compaction | `128000` / `16384` / `20000` |
 | `HARNESS_LLM_TIMEOUT`, `HARNESS_LLM_RETRIES`, `HARNESS_STREAM` | Model calls | `120` / `3` / `true` |
 | `HARNESS_MAX_PARALLEL_TOOLS`, `HARNESS_TOOL_TIMEOUT`, `HARNESS_TOOL_OUTPUT_LIMIT` | Tool execution | `6` / `120` / `8000` |
@@ -484,6 +487,7 @@ All routes except `/health` need `Authorization: Bearer <token>` and the listed 
 | GET | `/agents`, `/agents/{id}` | `agents:read` | Profiles and lifecycle state |
 | POST | `/sessions` | `sessions:write` | Create (`run: true` starts it; optional `verification`, `environment`) |
 | POST | `/sessions/{id}/run` · `/cancel` · `/interrupt` · `/fork` · `/rewind` | `sessions:write` | Control |
+| GET | `/sessions?status=&agent_id=&limit=` · `/usage?days=30&by=model|agent|day|session` | `sessions:read` | Session list with tokens and cost; spend report |
 | GET | `/sessions/{id}` · `/events` · `/stream` · `/verify-chain` | `sessions:read` | State, event log, SSE (`Last-Event-ID`), tamper check |
 | GET / POST | `/approvals` · `/approvals/{id}` | `approvals:read/write` | Pending approvals / decide |
 | GET / POST / DELETE | `/cron` · `/cron/{id}/pause` · `/cron/{id}` · `/heartbeat` | `cron:*` | Persistent schedules |

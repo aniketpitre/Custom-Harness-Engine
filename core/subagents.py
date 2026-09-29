@@ -61,7 +61,8 @@ async def run_subagent(parent: RunCtx, goal: str, *, profile: AgentProfile | Non
                 return {"session_id": session_id, "status": "failure", "error": "subagent timed out", "final_text": ""}
         assert final is not None
         status = derive_status(final["outcome"], final["verified"])
-        update_session(conn, session_id, status, outcome=final["outcome"], verified=final["verified"])
+        update_session(conn, session_id, status, outcome=final["outcome"], verified=final["verified"],
+                       usage=final.get("usage"))
         return {"session_id": session_id, "status": status, "outcome": final["outcome"],
                 "final_text": final["final_text"], "actions": len(final["actions"]),
                 "model_used": final["model_used"]}

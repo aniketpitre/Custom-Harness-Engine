@@ -17,6 +17,7 @@ class AgentProfile(BaseModel):
     version: int = 1
     max_turns: Optional[int] = None
     token_budget: Optional[int] = None
+    max_cost_usd: Optional[float] = None  # USD ceiling for one run including subagents; 0/None = settings
     deny_tools: List[str] = Field(default_factory=list)
     rules: List[str] = Field(default_factory=list)  # e.g. "deny:bash(rm *)", "ask:web_fetch"
     verification: Optional[Dict[str, str]] = None

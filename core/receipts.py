@@ -40,6 +40,7 @@ def build_receipt(
     started_at: datetime,
     teardown_tasks: list[str] | None = None,
     include_history: bool = True,
+    usage: dict | None = None,
 ) -> RunReceipt:
     verified = None if verification is None else verification.passed
     receipt = RunReceipt(
@@ -49,7 +50,7 @@ def build_receipt(
         message_history=eventlog.messages_for(conn, session_id) if include_history else None,
         status=derive_status(outcome, verified), outcome=outcome, verified=verified,
         chain_head=eventlog.chain_head(conn, session_id), started_at=started_at,
-        finished_at=datetime.now(timezone.utc), teardown_tasks=teardown_tasks or [])
+        finished_at=datetime.now(timezone.utc), teardown_tasks=teardown_tasks or [], usage=usage)
     if outcome == "completed" and verified:
         receipt.candidate_skill = draft_skill_if_warranted(receipt)
     return receipt
