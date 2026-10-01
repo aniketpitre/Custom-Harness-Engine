@@ -1,6 +1,6 @@
 # Harness Engine — Full Technical Audit & Competitive Gap Analysis
 
-**Subject:** `Custom-Harness-Engine-main` (uploaded 28 Sep 2026)
+**Subject:** `PenkoPerry-Harness-main` (uploaded 28 Sep 2026)
 **Compared against:** Claude Code (v2.1.28x), OpenClaw, Hermes Agent (Nous Research), Pi coding agent, DeepSeek Harness (`dsh`, built on Cordis) and the Cordis paper *A Programming Paradigm for Spatiotemporal Composability*
 **Scope:** read-only review. No code in your repository was changed.
 
@@ -397,7 +397,7 @@ Also add a **consecutive-error breaker**: for example, stop after 3 identical fa
 
 ### P0-13: Credential committed to the repository (Certain)
 
-**Evidence.** `tests/phase7/test_otel_init.py` sets `os.environ["VAULT_TOKEN"] = "c6869775…6803f4"` (a 64-hex token) and hard-codes the path `/workspaces/Custom-Harness-Engine`.
+**Evidence.** `tests/phase7/test_otel_init.py` sets `os.environ["VAULT_TOKEN"] = "c6869775…6803f4"` (a 64-hex token) and hard-codes the path `/workspaces/PenkoPerry-Harness`.
 
 **Fix.** **Rotate that Vault token now**, remove it from git history (`git filter-repo`), and add a secret scanner such as `gitleaks` as a pre-commit hook and in CI.
 
