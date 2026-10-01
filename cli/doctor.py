@@ -68,7 +68,7 @@ def collect(online: bool = False, port: int | None = None) -> list[Check]:
     checks: list[Check] = []
     ok_py = sys.version_info >= (3, 11)
     checks.append(Check("python", OK if ok_py else FAIL, sys.version.split()[0],
-                        "" if ok_py else "Penko Perry needs Python 3.11 or newer"))
+                        "" if ok_py else "PenkoPerry Harness needs Python 3.11 or newer"))
 
     home = harness_home()
     writable = home.exists() and os.access(home, os.W_OK)

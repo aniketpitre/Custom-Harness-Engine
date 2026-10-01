@@ -1,5 +1,5 @@
 #!/bin/sh
-# One-command installer for Penko Perry.
+# One-command installer for PenkoPerry Harness.
 #   curl -fsSL https://raw.githubusercontent.com/aniketpitre/PenkoPerry-Harness/main/install.sh | sh
 # Installs the `penko` command in an isolated environment (uv, else pipx, else a private venv).
 # Override the source with PENKO_SOURCE (a PyPI name, wheel, archive/git URL, or local path). PENKO_EXTRAS picks extras.
@@ -34,7 +34,7 @@ elif [ -n "$PYTHON" ]; then
   VENV="${PENKO_VENV:-$HOME/.penko/venv}"
   CMD="$PYTHON -m venv \"$VENV\" && \"$VENV/bin/pip\" install --upgrade pip && \"$VENV/bin/pip\" install \"$SPEC\" && mkdir -p \"$HOME/.local/bin\" && ln -sf \"$VENV/bin/penko\" \"$HOME/.local/bin/penko\""
 else
-  say "Penko Perry needs Python 3.11+ (or 'uv', which can fetch one)."
+  say "PenkoPerry Harness needs Python 3.11+ (or 'uv', which can fetch one)."
   say "Install uv:  curl -LsSf https://astral.sh/uv/install.sh | sh   then re-run this script."
   exit 1
 fi
@@ -44,7 +44,7 @@ if [ "${PENKO_INSTALL_DRY_RUN:-${HARNESS_INSTALL_DRY_RUN:-0}}" = "1" ]; then
   exit 0
 fi
 
-say "Installing Penko Perry ($SPEC)..."
+say "Installing PenkoPerry Harness ($SPEC)..."
 sh -c "$CMD"
 
 say ""

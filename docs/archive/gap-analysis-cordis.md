@@ -4,7 +4,7 @@
 
 Read-only architecture audit prompt for Claude Code.
 
-Compare the current Penko Perry codebase against:
+Compare the current PenkoPerry Harness codebase against:
 
 **A Programming Paradigm for Spatiotemporal Composability**  
 Authors: Yifan Shi, Wei Zhang  
@@ -36,7 +36,7 @@ The paper identifies self-evolving agent harnesses as a future application of th
 
 The key question for our project is:
 
-> **How ready is Penko Perry to safely add, remove, replace, reconfigure, and evolve its own components at runtime?**
+> **How ready is PenkoPerry Harness to safely add, remove, replace, reconfigure, and evolve its own components at runtime?**
 
 ---
 
@@ -646,7 +646,7 @@ Use this mapping:
 
 ## 18. Critical Architectural Question
 
-Determine whether Penko Perry is primarily:
+Determine whether PenkoPerry Harness is primarily:
 
 ### A
 Agent orchestration system
@@ -937,7 +937,7 @@ Explain:
 - Why it matters to our harness
 - What the paper does not provide
 
-## 2. Current Penko Perry Architecture
+## 2. Current PenkoPerry Harness Architecture
 
 Reconstruct the actual architecture.
 
@@ -1016,7 +1016,7 @@ Analyze component failure and recovery.
 
 Analyze self-modification and generated components.
 
-## 13. Cordis Concept → Penko Perry Mapping
+## 13. Cordis Concept → PenkoPerry Harness Mapping
 
 Use:
 
@@ -1429,7 +1429,7 @@ The goal is **not** to copy Cordis.
 
 The goal is to determine:
 
-> **Which of these properties Penko Perry already has, which it only approximates, and which are actually missing.**
+> **Which of these properties PenkoPerry Harness already has, which it only approximates, and which are actually missing.**
 
 Begin by scanning:
 

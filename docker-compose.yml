@@ -20,7 +20,7 @@ services:
       start_period: 5s
 
   # Seeds secrets with the dev root token, then mints a least-privilege read-only token for the
-  # Penko Perry. It never receives the root token or the raw provider key.
+  # PenkoPerry Harness. It never receives the root token or the raw provider key.
   vault-init:
     image: hashicorp/vault:1.20
     depends_on:

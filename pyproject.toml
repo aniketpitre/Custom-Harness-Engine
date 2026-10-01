@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "penko-perry"
 dynamic = ["version"]
 requires-python = ">=3.11"
-description = "Penko Perry: a policy-gated agent runtime for DevOps that turns goals into verified, audited outcomes"
+description = "PenkoPerry Harness, a custom harness engine: a policy-gated agent runtime for DevOps that turns goals into verified, audited outcomes"
 readme = "README.md"
 # Core runtime only. Domain packs and integrations are optional extras and import lazily.
 dependencies = [

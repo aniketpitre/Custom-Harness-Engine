@@ -1,8 +1,8 @@
 #!/bin/bash
-# Single-command setup: writes a private .env, then starts Vault + Penko Perry with Docker Compose.
+# Single-command setup: writes a private .env, then starts Vault + PenkoPerry Harness with Docker Compose.
 set -euo pipefail
 
-echo "Penko Perry setup"
+echo "PenkoPerry Harness setup"
 echo "--------------------"
 
 if [ ! -f .env ]; then
@@ -55,5 +55,5 @@ fi
 
 echo "Starting via Docker Compose..."
 docker compose up --build -d
-echo "Penko Perry API: http://127.0.0.1:8000  (Authorization: Bearer <PENKO_API_TOKEN>)"
+echo "PenkoPerry Harness API: http://127.0.0.1:8000  (Authorization: Bearer <PENKO_API_TOKEN>)"
 echo "Logs: docker compose logs -f penko"

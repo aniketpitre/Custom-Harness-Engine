@@ -1,10 +1,10 @@
-<p align="center"><img src="docs/images/wordmark.svg" alt="Penko Perry" width="560"></p>
+<p align="center"><img src="docs/images/wordmark.svg" alt="PenkoPerry Harness, a custom harness engine" width="620"></p>
 
-<p align="center"><b>Policy-gated agents for DevOps that turn goals into <i>verified</i> outcomes, and can prove what they did.</b></p>
+<p align="center"><b>PenkoPerry Harness is a custom harness engine: policy-gated agents for DevOps that turn goals into <i>verified</i> outcomes, and can prove what they did.</b></p>
 
 <p align="center"><code>penko chat</code> · <code>penko run</code> · <code>penko serve</code> · <code>penko dashboard</code></p>
 
-Most agent frameworks optimise what an agent *can do*. Penko Perry optimises whether the agent
+PenkoPerry Harness is a custom harness engine. Most agent frameworks optimise what an agent *can do*; PenkoPerry Harness optimises whether the agent
 *actually accomplished the goal* - safely, observably, and with a tamper-evident record - while staying
 small and fast. DevOps/SRE (Kubernetes, ArgoCD, GitOps) is the first domain pack; the core is domain-neutral.
 
@@ -32,7 +32,7 @@ penko cost                 # what you have spent, by model
 
 Using a different model provider, or your own model server? See [Connect a model provider](#connect-a-model-provider).
 
-- [Why Penko Perry](#why-penko-perry)
+- [Why PenkoPerry Harness](#why-penko-perry)
 - [Feature overview](#feature-overview)
 - [Architecture](#architecture)
 - [How a run works](#how-a-run-works)
@@ -46,7 +46,7 @@ Using a different model provider, or your own model server? See [Connect a model
 
 ---
 
-## Why Penko Perry
+## Why PenkoPerry Harness
 
 The design goal is to keep the strengths of the well-known agents while fixing the things they leave to the
 user. Each point below is something the code enforces and the test suite checks - not a roadmap item.
@@ -299,7 +299,7 @@ keep running. Agents need the `Dynamic` capability to see or call registered too
 - Constant-time comparison, per-token scopes (`sessions:write`, `approvals:write`, `admin` ...), sliding-window rate limit.
 - Secrets resolve from the environment, then Vault (one shared client, TTL cache); LLM keys are resolved **per
   model**, so a key for one provider is never sent to another.
-- Docker: Penko Perry receives a read-only Vault token, never the root token or the raw provider key.
+- Docker: PenkoPerry Harness receives a read-only Vault token, never the root token or the raw provider key.
 
 ---
 
@@ -394,7 +394,7 @@ await engine.plugins.load(MyPlugin())            # transactional; same name = re
 Comparison is based on each project's public documentation at the time of writing (see
 [`docs/archive/audit.md`](docs/archive/audit.md) for sources). Where another agent is ahead, we say so.
 
-| | Penko Perry | Claude Code | OpenClaw | Hermes Agent | Pi | DeepSeek Harness |
+| | PenkoPerry Harness | Claude Code | OpenClaw | Hermes Agent | Pi | DeepSeek Harness |
 |---|---|---|---|---|---|---|
 | Primary focus | Verified, audited operations | Interactive coding | Personal assistant / channels | Self-improving assistant | Minimal coding agent | Plugin-based harness |
 | Tiered deny-by-default risk (R0-R4) | **Yes, argument-aware** | Rules + modes | Modes + allowlists | Pattern risk | No (containers) | Plugin |
@@ -414,7 +414,7 @@ Comparison is based on each project's public documentation at the time of writin
 | Interactive TUI / IDE integration | No (API + CLI) | **Yes** | Yes | Yes | **Yes** | Yes |
 | Kernel size | ~2,500 lines | closed | large | large | very small | plugin-based |
 
-**Where Penko Perry is different, on purpose.** It is an *operations* runtime: the things that make
+**Where PenkoPerry Harness is different, on purpose.** It is an *operations* runtime: the things that make
 production automation trustworthy - argument-aware policy, verified completion, audited receipts, GitOps-first
 changes, out-of-band approvals - are core features rather than extensions. **Where it is not the right tool:**
 if you want an interactive coding terminal, IDE integration, or a multi-channel chat assistant, the projects
@@ -468,7 +468,7 @@ Development checkout: `pip install -e ".[dev]"`. Optional extras: `telegram`, `v
 
 ## Connect a model provider
 
-Penko Perry talks to models through [LiteLLM](https://docs.litellm.ai/docs/providers), so any provider LiteLLM
+PenkoPerry Harness talks to models through [LiteLLM](https://docs.litellm.ai/docs/providers), so any provider LiteLLM
 supports works. `penko init` sets up the common ones for you; everything ends up as a few lines in `~/.penko/.env`
 that you can also edit by hand.
 
@@ -546,9 +546,9 @@ An agent can pin its own model with `model:` in `~/.penko/config/agents.yaml`; `
 
 ## Brand
 
-![Penko Perry in the terminal](docs/images/terminal-banner.png)
+![PenkoPerry Harness in the terminal](docs/images/terminal-banner.png)
 
-Penko Perry's mascot is an original pixel-art platypus in deep pale green (`#5f9579`, deep `#2f5c48`, pale
+PenkoPerry Harness's mascot is an original pixel-art platypus in deep pale green (`#5f9579`, deep `#2f5c48`, pale
 `#c4dfd0`). One pixel grid in `core/brand.py` produces the logo (`docs/images/logo.svg`), the wordmark, the dashboard
 mark and the terminal banner; regenerate the files with `python -m core.brand`.
 
@@ -632,7 +632,7 @@ Stream event types: `message_delta`, `message`, `tool_call`, `tool_result`, `int
 
 ### Terminal theme
 
-The CLI wears the Penko Perry look: the pixel platypus in deep pale green (theme `perry`), themed status marks (✅ ⚠️ ❌), risk markers on approvals
+The CLI wears the PenkoPerry Harness look: the pixel platypus in deep pale green (theme `perry`), themed status marks (✅ ⚠️ ❌), risk markers on approvals
 (🟢 R0, 🟡 R1, 🟠 R2, 🔴 R3, ⛔ R4), live tool progress on stderr during `penko run`, and DevOps spinner verbs. Pick
 a skin with `penko theme set ember` (on-call orange) or `helm` (the original blue ship's wheel) or write your own YAML that extends one:
 
@@ -706,7 +706,7 @@ approvals, writes the job summary, and exposes `status`, `outcome`, `exit-code`,
 ## Docker
 
 `./start.sh` (or `docker compose up --build`) starts a dev Vault, seeds it, mints a **read-only** token for
-Penko Perry, and runs the API on `127.0.0.1:8000` as a non-root user with a separate `/workspace` volume. See
+PenkoPerry Harness, and runs the API on `127.0.0.1:8000` as a non-root user with a separate `/workspace` volume. See
 [`DOCKER.md`](DOCKER.md). Vault dev mode is not persistent and not for production.
 
 ---

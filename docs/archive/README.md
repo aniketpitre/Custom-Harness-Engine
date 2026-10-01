@@ -1,6 +1,6 @@
 # Design archive
 
-The research, audits and plans written while Penko Perry was designed and built. They are kept for the reasoning
+The research, audits and plans written while PenkoPerry Harness was designed and built. They are kept for the reasoning
 behind decisions and use the working names of the time. For the current state see
 [`../IMPLEMENTATION_STATUS.md`](../IMPLEMENTATION_STATUS.md) and [`../ROADMAP.md`](../ROADMAP.md).
 

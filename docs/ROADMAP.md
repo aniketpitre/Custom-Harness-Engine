@@ -6,9 +6,9 @@ release automation and the DevOps CLI theme. Sources are public web pages found 
 competitor capabilities below come from search summaries and third-party guides, not from reading their code.
 Treat the "others" column as a good-faith snapshot, not a certified comparison.
 
-## 1. Where Penko Perry stands today
+## 1. Where PenkoPerry Harness stands today
 
-| Area | Penko Perry | Industry reference | Verdict |
+| Area | PenkoPerry Harness | Industry reference | Verdict |
 |---|---|---|---|
 | Safety and policy | Argument-aware R0 to R4 tiers, deny > ask > allow rules, taint tracking, args-hash-bound approvals, timeouts deny | Claude Code permission modes and hooks; OWASP Agentic Top 10 | **Ahead** on rigour (see `docs/OWASP_AGENTIC_MAPPING.md`) |
 | Audit | Hash-chained event log, optional HMAC, receipts as projections, resume/fork | Transcripts (Claude Code, OpenClaw) | **Ahead** (tamper-evident) |
@@ -28,7 +28,7 @@ Treat the "others" column as a good-faith snapshot, not a certified comparison.
 
 ## 2. The theme (shipped in this change)
 
-`penko theme list|show|set NAME`, `PENKO_THEME`, and `~/.penko/skins/NAME.yaml`. The mascot is the Penko Perry
+`penko theme list|show|set NAME`, `PENKO_THEME`, and `~/.penko/skins/NAME.yaml`. The mascot is the PenkoPerry Harness
 platypus in deep pale green (skin `perry`, the default); the original ship's-wheel skin is `helm`. Other skins: `harbor`, `ember` (on-call),
 `forest`, `midnight`, `mono`. A skin controls colours, glyphs, the risk-tier markers (🟢🟡🟠🔴⛔), the approval
 prompt text, the tagline and the spinner verbs ("reconciling", "rolling out", "draining nodes"...). User skins
@@ -47,7 +47,7 @@ inherit any key they omit, like Hermes skins. Styling appears only on an interac
 | E1.4 | **Done.** Headless contract (`core/headless.py`, `action.yml`): `--output-format json|stream-json`, `--max-cost`, stable exit codes, a reusable GitHub Action | CI use is a headline use case for DevOps | S |
 | E1.5 | OpenTelemetry GenAI conventions: `gen_ai.operation.name`, `gen_ai.request.model`, `gen_ai.usage.*`, tool spans | Lets any OTel backend read our traces unchanged | S |
 
-### E2: DevOps differentiators (what makes Penko Perry the DevOps agent)
+### E2: DevOps differentiators (what makes PenkoPerry Harness the DevOps agent)
 
 | # | Item | Notes |
 |---|---|---|
@@ -62,7 +62,7 @@ inherit any key they omit, like Hermes skins. Styling appears only on an interac
 
 | # | Item | Notes |
 |---|---|---|
-| E3.1 | MCP: streamable HTTP client with OAuth, per-server allowlist and pinning, `penko mcp serve` (expose Penko Perry as an MCP server) | Also closes the supply-chain gap for MCP servers |
+| E3.1 | MCP: streamable HTTP client with OAuth, per-server allowlist and pinning, `penko mcp serve` (expose PenkoPerry Harness as an MCP server) | Also closes the supply-chain gap for MCP servers |
 | E3.2 | Installable plugin packages (Python entry points) and a bundle format for skills, hooks, MCP config | Claude Code plugin model; Agent Skills format compatibility check |
 | E3.3 | Managed policy file that user config cannot loosen (org-wide deny rules) | Enterprise requirement |
 | E3.4 | **Done.** Web dashboard (`core/ui/`, `/ui`) (sessions, approvals, live SSE, receipts) | The API already exposes everything it needs |

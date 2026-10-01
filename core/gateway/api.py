@@ -122,7 +122,7 @@ async def lifespan(app: FastAPI):
     await engine.shutdown()
 
 
-app = FastAPI(title="Penko Perry Control Plane API", lifespan=lifespan)
+app = FastAPI(title="PenkoPerry Harness Control Plane API", lifespan=lifespan)
 
 
 # -- dashboard ---------------------------------------------------------------------------

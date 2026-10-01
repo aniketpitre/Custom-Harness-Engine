@@ -1,5 +1,5 @@
 FROM python:3.12-slim
-LABEL org.opencontainers.image.title="Penko Perry" \
+LABEL org.opencontainers.image.title="PenkoPerry Harness" \
       org.opencontainers.image.description="Policy-gated agents for DevOps"
 
 # git: GitOps pull requests; bubblewrap: optional shell sandbox (PENKO_SANDBOX=bwrap)

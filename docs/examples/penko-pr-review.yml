@@ -1,4 +1,4 @@
-# Example: a read-only Penko Perry review of every pull request, with a spend cap.
+# Example: a read-only PenkoPerry Harness review of every pull request, with a spend cap.
 # Copy to .github/workflows/ in your repository and add the provider key as a secret.
 name: penko-review
 on: pull_request
@@ -22,4 +22,4 @@ jobs:
           max-cost: "0.50"
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      - run: echo "Penko Perry spent ${{ steps.penko.outputs.cost-usd }} USD (${{ steps.penko.outputs.outcome }})"
+      - run: echo "PenkoPerry Harness spent ${{ steps.penko.outputs.cost-usd }} USD (${{ steps.penko.outputs.outcome }})"

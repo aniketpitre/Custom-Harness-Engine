@@ -465,7 +465,7 @@ def cmd_version(args) -> int:
 
 # ---------------------------------------------------------------------------
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="penko", description="Penko Perry: policy-gated, verified, audited agents for DevOps "
+    p = argparse.ArgumentParser(prog="penko", description="PenkoPerry Harness: policy-gated, verified, audited agents for DevOps "
                                 "(`penko` works as an alias)")
     sub = p.add_subparsers(dest="command")
 

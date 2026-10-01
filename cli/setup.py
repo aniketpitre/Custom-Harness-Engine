@@ -15,7 +15,7 @@ PROVIDERS = {
 def setup() -> None:
     import questionary  # optional dependency: pip install "penko-perry[setup]"
 
-    print("Welcome to Penko Perry setup!")
+    print("Welcome to PenkoPerry Harness setup!")
     client = get_vault_client()
     mount = "harness-secrets"
 

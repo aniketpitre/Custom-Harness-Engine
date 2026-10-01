@@ -1,4 +1,4 @@
-"""The Penko Perry home directory: per-user config, secrets file and data (default ~/.penko, or $PENKO_HOME).
+"""The PenkoPerry Harness home directory: per-user config, secrets file and data (default ~/.penko, or $PENKO_HOME).
 
 Layout:
   ~/.penko/.env            settings and secrets written by `penko init` (mode 600), as PENKO_* variables

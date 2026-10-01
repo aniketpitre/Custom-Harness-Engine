@@ -1,10 +1,10 @@
-# OWASP Top 10 for Agentic Applications: how Penko Perry responds
+# OWASP Top 10 for Agentic Applications: how PenkoPerry Harness responds
 
 Covers the seven risks named in the public OWASP summary (see the source link in `docs/ROADMAP.md`). The
 remaining three entries were not visible in the material available when this was written and are not
 mapped here rather than guessed. "Gap" means a known hole, not a claim of full coverage.
 
-| Risk | Controls in Penko Perry | Where | Gap |
+| Risk | Controls in PenkoPerry Harness | Where | Gap |
 |---|---|---|---|
 | Agent goal hijack | Taint tracking: after untrusted content (web, files, tool output) enters context, mutating tiers are raised; fetched memory carries provenance | `core/policy.py`, `core/tools.py`, `core/plugins/memory_tool.py` | No classifier for injected instructions; relies on policy, not detection |
 | Tool misuse | Argument-aware R0 to R4 tiers, deny > ask > allow rules, protected namespaces are R4, shell command classifier, args-hash-bound approvals, loop guard | `core/policy.py`, `core/approvals.py`, `core/loop.py` | Rules are only as good as the operator's config |

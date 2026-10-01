@@ -1,13 +1,14 @@
-"""Penko Perry brand: name, colours and the pixel platypus.
+"""PenkoPerry Harness brand: name, colours and the pixel platypus.
 
 One pixel grid is the single source for the SVG logo, the dashboard mark and the terminal banner, so they can
 never drift apart. Regenerate the static logo files with `python -m core.brand` after changing the grid.
 """
 from __future__ import annotations
 
-NAME = "Penko Perry"
+NAME = "PenkoPerry Harness"
 COMMAND = "penko"
-TAGLINE = "policy-gated agents for DevOps"
+TAGLINE = "a custom harness engine for policy-gated DevOps agents"
+DESCRIPTION = "a custom harness engine"
 
 # deep pale green palette
 COLORS = {
@@ -64,11 +65,15 @@ def wordmark_svg() -> str:
     mark = svg(pixel=1, pad=0)
     inner = mark[mark.index(">") + 1:mark.rindex("</svg>")].replace(f"<title>{NAME}</title>", "")
     gw, gh = len(GRID[0]), len(GRID)
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {gw + 78} {gh + 2}" width="{(gw + 78) * 6}" '
-            f'height="{(gh + 2) * 6}" role="img" aria-label="{NAME}"><title>{NAME}</title>'
+    width = gw + 10 + round(len(NAME) * 5.6)         # room for the name at font-size 8.4
+    font = "ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif"
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {gh + 4}" width="{width * 6}" '
+            f'height="{(gh + 4) * 6}" role="img" aria-label="{NAME}, {DESCRIPTION}"><title>{NAME}</title>'
             f'<g transform="translate(1 1)" shape-rendering="crispEdges">{inner}</g>'
-            f'<text x="{gw + 5}" y="{gh - 1}" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif" '
-            f'font-size="8.4" font-weight="700" fill="{COLORS["D"]}">{NAME}</text></svg>')
+            f'<text x="{gw + 5}" y="{gh - 1.8}" font-family="{font}" font-size="8.4" font-weight="700" '
+            f'fill="{COLORS["D"]}">{NAME}</text>'
+            f'<text x="{gw + 5.3}" y="{gh + 2.9}" font-family="{font}" font-size="3.6" fill="{COLORS["B"]}">'
+            f'{DESCRIPTION}</text></svg>')
 
 
 # terminal colours (xterm-256) closest to the palette

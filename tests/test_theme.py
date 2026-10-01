@@ -43,8 +43,8 @@ def test_doctor_json_is_never_styled(tty, monkeypatch):
 
 def test_terminal_gets_banner_colour_and_emoji(tty):
     text = theme.banner("1.0", tty)
-    assert "\033[38;5;65" in text and "▀" in text and "Penko Perry 1.0" in text      # the green pixel platypus
-    assert "policy-gated agents for DevOps" in text
+    assert "\033[38;5;65" in text and "▀" in text and "PenkoPerry Harness 1.0" in text      # the green pixel platypus
+    assert "a custom harness engine for DevOps agents" in text
     assert theme.glyph("ok", tty) == "✅" and theme.risk_mark("R3", tty) == "🔴"
 
 
@@ -80,7 +80,7 @@ def test_user_skin_inherits_missing_keys_and_can_be_selected(tty, monkeypatch):
     monkeypatch.setenv("HARNESS_THEME", "acme")
     skin = theme.current()
     assert skin.tagline == "acme platform" and skin.glyphs["ok"] == "✅" and skin.verbs == ("buzzing",)
-    assert "Penko Perry 1.0 🐝" in theme.banner("1.0", tty) and theme.verb() == "buzzing"
+    assert "PenkoPerry Harness 1.0 🐝" in theme.banner("1.0", tty) and theme.verb() == "buzzing"
 
 
 def test_broken_user_skin_is_ignored(monkeypatch):

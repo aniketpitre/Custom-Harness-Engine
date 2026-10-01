@@ -1,5 +1,5 @@
-name: Penko Perry
-description: Run a policy-gated Penko Perry agent on a goal and report the result, cost and actions.
+name: PenkoPerry Harness
+description: Run a policy-gated PenkoPerry Harness agent on a goal and report the result, cost and actions.
 author: aniketpitre
 branding:
   icon: shield
@@ -60,7 +60,7 @@ runs:
     - uses: actions/setup-python@v5
       with:
         python-version: ${{ inputs.python-version }}
-    - name: Install Penko Perry
+    - name: Install PenkoPerry Harness
       shell: bash
       env:
         EXTRAS: ${{ inputs.extras }}

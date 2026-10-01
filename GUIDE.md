@@ -1,4 +1,4 @@
-# Penko Perry User Guide
+# PenkoPerry Harness User Guide
 
 ## 1. Configure
 

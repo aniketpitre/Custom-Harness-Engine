@@ -2,7 +2,7 @@
 
 Styling only ever appears on an interactive terminal. Piped or redirected output, `--json`, and anything a
 script might parse stay plain, so receipts and the doctor JSON never contain escape codes. Built-in skins
-live here (the default is `perry`, the Penko Perry platypus in deep pale green); drop a YAML file in
+live here (the default is `perry`, the PenkoPerry Harness platypus in deep pale green); drop a YAML file in
 `~/.penko/skins/<name>.yaml` to add your own (it inherits every key you leave out from `perry`). Choose one with `penko theme set NAME` or `PENKO_THEME=NAME`.
 
 Environment: NO_COLOR disables colour, PENKO_COLOR=always|never|auto, PENKO_ASCII=1 disables emoji,
@@ -61,7 +61,7 @@ def _skin(name: str, description: str, tagline: str, brand: str, mascot: str, **
 
 
 PERRY = replace(
-    HELM, name="perry", description="Penko Perry: deep pale green, the platypus (default)", tagline="policy-gated agents for DevOps",
+    HELM, name="perry", description="PenkoPerry Harness: deep pale green, the platypus (default)", tagline="a custom harness engine for DevOps agents",
     colors={**HELM.colors, "brand": "perry", "accent": "bold+perry-pale"},
     glyphs={**HELM.glyphs, "mascot": "🌿", "run": "🌿"},
     verbs=("paddling upstream", "reconciling", "rolling out", "sniffing the logs", "tracing the request",
