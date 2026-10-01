@@ -56,7 +56,7 @@ def resolve_workspace_path(
         for protected in ENGINE_PROTECTED:
             target = (ENGINE_ROOT / protected).resolve()
             if resolved == target or target in resolved.parents:
-                raise ConfinementError("Writes to harness engine sources are not allowed")
+                raise ConfinementError("Writes to Penko Perry's own sources are not allowed")
     return resolved
 
 

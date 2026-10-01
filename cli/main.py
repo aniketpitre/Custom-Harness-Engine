@@ -1,4 +1,4 @@
-"""The `harness` command: init, serve, run, doctor, token, sessions, approvals, plugins, version."""
+"""The `penko` command: init, serve, run, doctor, token, sessions, approvals, plugins, version."""
 from __future__ import annotations
 
 import argparse
@@ -19,8 +19,21 @@ PROVIDERS = {
     "anthropic": ("ANTHROPIC_API_KEY", "anthropic/claude-sonnet-4-5"),
     "openrouter": ("OPENROUTER_API_KEY", "openrouter/auto"),
     "nvidia": ("NVIDIA_API_KEY", "nvidia_nim/meta/llama-3.1-70b-instruct"),
+    "lmstudio": ("", "lm_studio/qwen/qwen3-4b"),
     "local": ("", "ollama_chat/llama3.1"),
 }
+LMSTUDIO_URL = "http://localhost:1234/v1"
+
+
+def _lmstudio_models(base: str) -> list[str]:
+    """Model ids LM Studio is serving right now (empty when it is not running)."""
+    try:
+        import httpx
+
+        r = httpx.get(f"{base.rstrip('/')}/models", timeout=2.0)
+        return [m["id"] for m in r.json().get("data", []) if "embed" not in m["id"].lower()]
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def _ask(prompt: str, default: str = "", secret: bool = False) -> str:
@@ -40,9 +53,22 @@ def cmd_init(args) -> int:
         print(f"Unknown provider {provider!r}; choose from: {', '.join(PROVIDERS)}", file=sys.stderr)
         return 2
     key_var, default_model = PROVIDERS[provider]
+    extra: dict[str, str] = {}
+    if provider == "lmstudio":
+        base = args.base_url or LMSTUDIO_URL
+        served = _lmstudio_models(base)
+        if served:
+            default_model = "lm_studio/" + served[0]
+            print(f"LM Studio is serving: {', '.join(served)}")
+        else:
+            print(f"note: LM Studio is not answering at {base}; start its server (Developer tab) and load a model.",
+                  file=sys.stderr)
+        # small local models: a context that fits a 16k window, and a little more time per call
+        extra = {"LM_STUDIO_API_BASE": base, "HARNESS_CONTEXT_WINDOW": str(args.context_window or 16384),
+                 "HARNESS_RESERVE_TOKENS": "2048", "HARNESS_KEEP_RECENT_TOKENS": "6000", "HARNESS_LLM_TIMEOUT": "300"}
     model = args.model or (_ask("Model", default_model) if interactive else default_model)
 
-    values: dict[str, str] = {"HARNESS_MODEL": model}
+    values: dict[str, str] = {"HARNESS_MODEL": model, **extra}
     api_key = args.api_key or (os.environ.get(args.api_key_env) if args.api_key_env else None)
     if key_var and not api_key and not os.environ.get(key_var):
         api_key = _ask(f"{provider} API key (input hidden, stored in {env_file()})", secret=True) if interactive else None
@@ -88,12 +114,12 @@ def cmd_init(args) -> int:
              else f"{path} (mode 600)")
     print(f"Harness home: {home}\nSecrets stored in: {where}")
     print(f"Agents: {agents}  (edit to change what agents may do)")
-    print("API token: show it with `harness token`.")
+    print("API token: show it with `penko token`.")
     load_env(override=True)
     from cli.doctor import collect, render
 
     print("\n" + render(collect()))
-    print(f"\n{theme.glyph('run')} Next: `harness serve`   then   `harness run \"List the files in the workspace\"`".lstrip())
+    print(f"\n{theme.glyph('run')} Next: `penko serve`   then   `penko run \"List the files in the workspace\"`".lstrip())
     return 0
 
 
@@ -134,7 +160,7 @@ def cmd_token(args) -> int:
     load_env()
     token = os.environ.get("HARNESS_API_TOKEN")
     if not token:
-        print("No API token configured. Run `harness init`.", file=sys.stderr)
+        print("No API token configured. Run `penko init`.", file=sys.stderr)
         return 1
     print(token)
     return 0
@@ -148,14 +174,14 @@ def cmd_serve(args) -> int:
     st = settings()
     host, port = args.host or st.api_host, args.port or st.api_port
     if not st.api_tokens:
-        print("HARNESS_API_TOKEN is not set: the API would reject every request. Run `harness init`.", file=sys.stderr)
+        print("HARNESS_API_TOKEN is not set: the API would reject every request. Run `penko init`.", file=sys.stderr)
         return 1
     if host not in {"127.0.0.1", "localhost", "::1"}:
         print(f"warning: binding to {host}; make sure the API is not reachable by untrusted networks.", file=sys.stderr)
     import uvicorn
 
     print(theme.banner(__version__, sys.stderr), end="", file=sys.stderr)
-    print(f"Dashboard: {_dashboard_url(host, port)}   (open it signed in with `harness dashboard`)", file=sys.stderr)
+    print(f"Dashboard: {_dashboard_url(host, port)}   (open it signed in with `penko dashboard`)", file=sys.stderr)
     uvicorn.run("core.gateway.api:app", host=host, port=port, log_level=args.log_level)
     return 0
 
@@ -173,7 +199,7 @@ def cmd_dashboard(args) -> int:
     st = settings()
     token = os.environ.get("HARNESS_API_TOKEN")
     if not token:
-        print("No API token configured. Run `harness init`.", file=sys.stderr)
+        print("No API token configured. Run `penko init`.", file=sys.stderr)
         return 1
     url = _dashboard_url(args.host or st.api_host, args.port or st.api_port)
     if args.print_url:
@@ -182,9 +208,9 @@ def cmd_dashboard(args) -> int:
     import webbrowser
 
     if not webbrowser.open(f"{url}#token={token}"):
-        print(f"Open {url} and paste the token from `harness token`.")
+        print(f"Open {url} and paste the token from `penko token`.")
     else:
-        print(f"Opened {url} (start the server with `harness serve` if it is not running).")
+        print(f"Opened {url} (start the server with `penko serve` if it is not running).")
     return 0
 
 
@@ -355,7 +381,7 @@ def cmd_approvals(args) -> int:
             resp = _api(args, "POST", f"/approvals/{args.approval_id}",
                         {"approved": args.action == "approve", "scope": args.scope, "note": args.note})
     except Exception as error:  # noqa: BLE001
-        print(f"Could not reach the API: {error}. Is `harness serve` running?", file=sys.stderr)
+        print(f"Could not reach the API: {error}. Is `penko serve` running?", file=sys.stderr)
         return 1
     if resp.status_code != 200:
         print(f"{resp.status_code}: {resp.text}", file=sys.stderr)
@@ -396,7 +422,7 @@ def cmd_theme(args) -> int:
         for key, skin in skins.items():
             mark = "*" if key == name else " "
             print(f"{mark} {theme.preview(skin) if theme.styled() else f'{key:<9} {skin.description}'}")
-        print(f"\nActive: {name}. Change it with `harness theme set NAME`; add your own in {theme.skins_dir()}/NAME.yaml")
+        print(f"\nActive: {name}. Change it with `penko theme set NAME`; add your own in {theme.skins_dir()}/NAME.yaml")
         return 0
     if args.action == "show":
         print(theme.banner(__version__), end="")
@@ -414,13 +440,14 @@ def cmd_theme(args) -> int:
 
 def cmd_version(args) -> int:
     print(theme.banner(__version__), end="")
-    print(f"harness-engine {__version__}  (home: {harness_home()})")
+    print(f"penko-perry {__version__}  (home: {harness_home()})")
     return 0
 
 
 # ---------------------------------------------------------------------------
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="harness", description="Harness Engine: verified, audited agent runtime")
+    p = argparse.ArgumentParser(prog="penko", description="Penko Perry: policy-gated, verified, audited agents for DevOps "
+                                "(`penko` works as an alias)")
     sub = p.add_subparsers(dest="command")
 
     i = sub.add_parser("init", help="first-run setup (model, key, API token, approvals)")
@@ -428,7 +455,9 @@ def build_parser() -> argparse.ArgumentParser:
     i.add_argument("--model")
     i.add_argument("--api-key", help="prefer --api-key-env: command lines end up in shell history")
     i.add_argument("--api-key-env", metavar="VAR", help="read the provider key from this environment variable")
-    i.add_argument("--base-url", help="OpenAI-compatible base URL for --provider local")
+    i.add_argument("--base-url", help="server URL for --provider local or lmstudio (LM Studio default: "
+                   "http://localhost:1234/v1)")
+    i.add_argument("--context-window", type=int, help="context length the model was loaded with (lmstudio: 16384)")
     i.add_argument("--telegram-bot-token")
     i.add_argument("--telegram-bot-token-env", metavar="VAR")
     i.add_argument("--telegram-chat-id")
@@ -462,7 +491,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="permission mode: plan = read-only until you approve the plan")
     r.set_defaults(fn=cmd_run)
 
-    db = sub.add_parser("dashboard", help="open the web dashboard (served by `harness serve` at /ui)")
+    db = sub.add_parser("dashboard", help="open the web dashboard (served by `penko serve` at /ui)")
     db.add_argument("--host")
     db.add_argument("--port", type=int)
     db.add_argument("--print-url", action="store_true", help="print the URL (without the token) instead of opening it")

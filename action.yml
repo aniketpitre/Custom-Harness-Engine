@@ -1,5 +1,5 @@
-name: Harness Engine
-description: Run a policy-gated Harness Engine agent on a goal and report the result, cost and actions.
+name: Penko Perry
+description: Run a policy-gated Penko Perry agent on a goal and report the result, cost and actions.
 author: aniketpitre
 branding:
   icon: shield
@@ -60,7 +60,7 @@ runs:
     - uses: actions/setup-python@v5
       with:
         python-version: ${{ inputs.python-version }}
-    - name: Install Harness Engine
+    - name: Install Penko Perry
       shell: bash
       env:
         EXTRAS: ${{ inputs.extras }}
@@ -90,7 +90,7 @@ runs:
         [ -n "$MODEL" ] && args+=(--model "$MODEL")
         [ -n "$MAX_COST" ] && [ "$MAX_COST" != "0" ] && args+=(--max-cost "$MAX_COST")
         if [ -n "$GOAL_FILE" ]; then args+=(--goal-file "$GOAL_FILE"); else args+=(-); fi
-        if [ -n "$GOAL_FILE" ]; then harness "${args[@]}" > "$result"; else printf '%s' "$GOAL" | harness "${args[@]}" > "$result"; fi
+        if [ -n "$GOAL_FILE" ]; then penko "${args[@]}" > "$result"; else printf '%s' "$GOAL" | penko "${args[@]}" > "$result"; fi
         code=$?
         python - "$result" "$code" <<'PY' >> "$GITHUB_OUTPUT"
         import json, sys

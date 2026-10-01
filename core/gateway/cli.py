@@ -89,7 +89,7 @@ async def handle_cli_input(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run one goal through the Harness Engine")
+    parser = argparse.ArgumentParser(description="Run one goal through Penko Perry")
     parser.add_argument("goal", nargs="+")
     parser.add_argument("--agent", default=DEFAULT_AGENT)
     parser.add_argument("--verify-file", nargs=2, metavar=("PATH", "EXPECTED"),

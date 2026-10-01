@@ -150,10 +150,10 @@ SHIM = textwrap.dedent('''\
 
 @pytest.mark.parametrize("fail_on,expected_exit", [("failure", 0), ("never", 0)])
 def test_action_run_step_end_to_end(tmp_path, fail_on, expected_exit):
-    """Execute the action's real bash step with a `harness` shim that fakes only the model."""
+    """Execute the action's real bash step with a `penko` shim that fakes only the model."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    shim = bin_dir / "harness"
+    shim = bin_dir / "penko"
     shim.write_text(SHIM.format(python=sys.executable, root=str(ROOT), reply="LGTM"))
     shim.chmod(0o755)
     step = next(s for s in ACTION["runs"]["steps"] if s.get("id") == "run")

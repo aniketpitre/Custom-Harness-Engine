@@ -2,7 +2,7 @@
 # Single-command setup: writes a private .env, then starts Vault + the harness with Docker Compose.
 set -euo pipefail
 
-echo "Harness Engine setup"
+echo "Penko Perry setup"
 echo "--------------------"
 
 if [ ! -f .env ]; then
@@ -55,5 +55,5 @@ fi
 
 echo "Starting via Docker Compose..."
 docker compose up --build -d
-echo "Harness Engine API: http://127.0.0.1:8000  (Authorization: Bearer <HARNESS_API_TOKEN>)"
+echo "Penko Perry API: http://127.0.0.1:8000  (Authorization: Bearer <HARNESS_API_TOKEN>)"
 echo "Logs: docker compose logs -f harness"

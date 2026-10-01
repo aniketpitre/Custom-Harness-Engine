@@ -1,7 +1,7 @@
 """The Harness home directory: per-user config, secrets file and data (default ~/.harness).
 
 Layout:
-  $HARNESS_HOME/.env            secrets and settings written by `harness init` (mode 600)
+  $HARNESS_HOME/.env            secrets and settings written by `penko init` (mode 600)
   $HARNESS_HOME/config/         user overrides: agents.yaml, settings.yaml, mcp.yaml, hooks.yaml
   $HARNESS_HOME/data/           SQLite database, spilled outputs, checkpoints, skills, dynamic tools
 
@@ -118,7 +118,7 @@ def write_env(values: dict[str, str], store: str = "file") -> Path:
 def _write_file(values: dict[str, str]) -> Path:
     """Atomically write the .env with mode 600."""
     path = env_file()
-    body = "# Written by `harness init`. Keep private (mode 600).\n" + "".join(f"{k}={v}\n" for k, v in values.items())
+    body = "# Written by `penko init`. Keep private (mode 600).\n" + "".join(f"{k}={v}\n" for k, v in values.items())
     tmp = path.with_suffix(".tmp")
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as fh:

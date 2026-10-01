@@ -8,17 +8,17 @@ Treat the "others" column as a good-faith snapshot, not a certified comparison.
 
 ## 1. Where the harness stands today
 
-| Area | Harness Engine | Industry reference | Verdict |
+| Area | Penko Perry | Industry reference | Verdict |
 |---|---|---|---|
 | Safety and policy | Argument-aware R0 to R4 tiers, deny > ask > allow rules, taint tracking, args-hash-bound approvals, timeouts deny | Claude Code permission modes and hooks; OWASP Agentic Top 10 | **Ahead** on rigour (see `docs/OWASP_AGENTIC_MAPPING.md`) |
 | Audit | Hash-chained event log, optional HMAC, receipts as projections, resume/fork | Transcripts (Claude Code, OpenClaw) | **Ahead** (tamper-evident) |
-| Install | One command, `harness init/doctor`, keyring secrets, wheel + installer | Same one-liner style | **On par** |
+| Install | One command, `penko init/doctor`, keyring secrets, wheel + installer | Same one-liner style | **On par** |
 | Approvals | Terminal, API and Telegram at once, first answer wins | Claude Code: terminal only; OpenClaw: chat channels | **On par**, Slack missing |
 | Verification | Verifier registry, independent verifier agent | Rare elsewhere | **Ahead** |
 | DevOps depth | kubectl, ArgoCD, GitOps via worktree, protected namespaces | HolmesGPT: 30+ observability toolsets, alert-triggered investigation, runbooks | **Behind** on breadth (observability) |
-| Interactive use | `harness chat` (multi-turn, inline approvals, slash commands, resume), `harness run`, API + SSE | Claude Code, Hermes, OpenClaw: full interactive TUI/REPL | **Behind** |
+| Interactive use | `penko chat` (multi-turn, inline approvals, slash commands, resume), `penko run`, API + SSE | Claude Code, Hermes, OpenClaw: full interactive TUI/REPL | **Behind** |
 | Channels | Telegram, terminal, API | OpenClaw: 20+ channels; Hermes: messaging platforms | **Behind** (Slack/Teams matter most for DevOps) |
-| Cost | Per-call USD in the event log, USD budget, `harness cost`, `GET /usage`, cost in receipts and session lists | Claude Code `/cost` and status line; OpenClaw usage tracking | **On par** |
+| Cost | Per-call USD in the event log, USD budget, `penko cost`, `GET /usage`, cost in receipts and session lists | Claude Code `/cost` and status line; OpenClaw usage tracking | **On par** |
 | MCP | Client, stdio transport only | Remote (HTTP) servers with OAuth; agents that are themselves MCP servers | **Behind** |
 | Extension packaging | In-tree plugins, `SKILL.md` skills | Claude Code plugins bundle skills, subagents, hooks, MCP; Agent Skills is now an open format with 46+ adopting products | **Behind** on distribution |
 | Web UI | Dashboard at `/ui`: sessions with live timelines, approvals, usage, schedules, agents, plugins | OpenClaw Control UI | **Behind** |
@@ -28,8 +28,8 @@ Treat the "others" column as a good-faith snapshot, not a certified comparison.
 
 ## 2. The theme (shipped in this change)
 
-`harness theme list|show|set NAME`, `HARNESS_THEME`, and `~/.harness/skins/NAME.yaml`. The mascot is the ship's
-wheel (helm), the DevOps nod to Kubernetes. Six built-in skins: `helm` (default), `harbor`, `ember` (on-call),
+`penko theme list|show|set NAME`, `HARNESS_THEME`, and `~/.harness/skins/NAME.yaml`. The mascot is the Penko Perry
+platypus in deep pale green (skin `perry`, the default); the original ship's-wheel skin is `helm`. Other skins: `harbor`, `ember` (on-call),
 `forest`, `midnight`, `mono`. A skin controls colours, glyphs, the risk-tier markers (🟢🟡🟠🔴⛔), the approval
 prompt text, the tagline and the spinner verbs ("reconciling", "rolling out", "draining nodes"...). User skins
 inherit any key they omit, like Hermes skins. Styling appears only on an interactive terminal: piped output,
@@ -41,8 +41,8 @@ inherit any key they omit, like Hermes skins. Styling appears only on an interac
 
 | # | Item | Why | Size |
 |---|---|---|---|
-| E1.1 | **Done.** Cost accounting: per-call, per-session and per-agent USD from LiteLLM's price map, a `max_cost_usd` budget, `harness sessions` shows cost, cost in receipts | Every reference agent shows cost; teams need a spend ceiling | S |
-| E1.2 | **Done.** `harness chat` (`cli/chat.py`): interactive REPL on the existing engine (streaming, `/rewind`, `/cost`, `/theme`, `/approve`), themed status line | Biggest usability gap versus Claude Code, Hermes and OpenClaw | M |
+| E1.1 | **Done.** Cost accounting: per-call, per-session and per-agent USD from LiteLLM's price map, a `max_cost_usd` budget, `penko sessions` shows cost, cost in receipts | Every reference agent shows cost; teams need a spend ceiling | S |
+| E1.2 | **Done.** `penko chat` (`cli/chat.py`): interactive REPL on the existing engine (streaming, `/rewind`, `/cost`, `/theme`, `/approve`), themed status line | Biggest usability gap versus Claude Code, Hermes and OpenClaw | M |
 | E1.3 | **Done.** Permission modes (`core/modes.py`; `accept-edits` dropped because workspace edits are already R1 and run without asking): `plan` (read-only until the plan is approved), `read-only`, `strict` | Familiar mental model; maps onto the existing tiers, so small | S |
 | E1.4 | **Done.** Headless contract (`core/headless.py`, `action.yml`): `--output-format json|stream-json`, `--max-cost`, stable exit codes, a reusable GitHub Action | CI use is a headline use case for DevOps | S |
 | E1.5 | OpenTelemetry GenAI conventions: `gen_ai.operation.name`, `gen_ai.request.model`, `gen_ai.usage.*`, tool spans | Lets any OTel backend read our traces unchanged | S |

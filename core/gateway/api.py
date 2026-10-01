@@ -122,13 +122,13 @@ async def lifespan(app: FastAPI):
     await engine.shutdown()
 
 
-app = FastAPI(title="Harness Engine Control Plane API", lifespan=lifespan)
+app = FastAPI(title="Penko Perry Control Plane API", lifespan=lifespan)
 
 
 # -- dashboard ---------------------------------------------------------------------------
 _UI_DIR = __import__("pathlib").Path(__file__).resolve().parent.parent / "ui"
 _UI_FILES = {"": ("index.html", "text/html; charset=utf-8"), "app.js": ("app.js", "text/javascript; charset=utf-8"),
-             "app.css": ("app.css", "text/css; charset=utf-8")}
+             "app.css": ("app.css", "text/css; charset=utf-8"), "logo.svg": ("logo.svg", "image/svg+xml")}
 _UI_HEADERS = {
     # no inline script, no third-party origins, no framing: the page only talks to this API
     "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "

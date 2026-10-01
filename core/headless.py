@@ -1,6 +1,6 @@
 """Headless contract for scripts and CI: a stable result object, JSONL event stream and exit codes.
 
-`harness run --output-format`:
+`penko run --output-format`:
   receipt      the full RunReceipt, pretty JSON (default; unchanged from earlier releases)
   json         one compact result object (RESULT_SCHEMA_VERSION), no transcript
   stream-json  one JSON object per line as the run progresses, ending with {"type": "result", ...}

@@ -1,4 +1,4 @@
-"""`harness doctor`: checks the installation and prints the exact fix for anything that is wrong."""
+"""`penko doctor`: checks the installation and prints the exact fix for anything that is wrong."""
 from __future__ import annotations
 
 import asyncio
@@ -31,7 +31,7 @@ def _module(mod: str, extra: str, needed_for: str) -> Check:
     if importlib.util.find_spec(mod):
         return Check(f"python:{mod}", OK, "installed")
     return Check(f"python:{mod}", WARN, f"not installed (needed for {needed_for})",
-                 f'pip install "harness-engine[{extra}]"')
+                 f'pip install "penko-perry[{extra}]"')
 
 
 def _secret_store_checks() -> list[Check]:
@@ -43,8 +43,8 @@ def _secret_store_checks() -> list[Check]:
     if items:
         if not keystore.available():
             return [Check("secret store", FAIL, f"{len(items)} secret(s) are in the OS keyring, but no keyring backend is usable "
-                          f"({keystore.backend_name()})", 'pip install "harness-engine[keyring]" and unlock the keyring, '
-                          "or re-run `harness init --secret-store file` after `harness secret set NAME`")]
+                          f"({keystore.backend_name()})", 'pip install "penko-perry[keyring]" and unlock the keyring, '
+                          "or re-run `penko init --secret-store file` after `penko secret set NAME`")]
         missing = [n for n in items if keystore.get(n) is None]
         if missing:
             return [Check("secret store", FAIL, f"missing from the keyring: {', '.join(missing)}",
@@ -53,7 +53,7 @@ def _secret_store_checks() -> list[Check]:
     loose = [k for k in values if keystore.is_secret_name(k)]
     if loose and keystore.available():
         return [Check("secret store", WARN, f"{len(loose)} secret(s) are stored in the .env file although the OS keyring "
-                      f"({keystore.backend_name()}) is available", "run `harness init -y --secret-store keyring` to move them")]
+                      f"({keystore.backend_name()}) is available", "run `penko init -y --secret-store keyring` to move them")]
     return [Check("secret store", OK, "mode-600 .env file" if loose else "no secrets stored yet")]
 
 
@@ -68,12 +68,12 @@ def collect(online: bool = False, port: int | None = None) -> list[Check]:
     checks: list[Check] = []
     ok_py = sys.version_info >= (3, 11)
     checks.append(Check("python", OK if ok_py else FAIL, sys.version.split()[0],
-                        "" if ok_py else "Harness Engine needs Python 3.11 or newer"))
+                        "" if ok_py else "Penko Perry needs Python 3.11 or newer"))
 
     home = harness_home()
     writable = home.exists() and os.access(home, os.W_OK)
     checks.append(Check("home", OK if writable else WARN, str(home),
-                        "" if writable else "run `harness init` to create it"))
+                        "" if writable else "run `penko init` to create it"))
     env = env_file()
     if env.exists():
         private = is_private(env)
@@ -83,21 +83,23 @@ def collect(online: bool = False, port: int | None = None) -> list[Check]:
     checks.extend(_secret_store_checks())
     checks.append(Check("api token", OK if st.api_tokens else FAIL,
                         "configured" if st.api_tokens else "HARNESS_API_TOKEN is not set (API refuses all requests)",
-                        "" if st.api_tokens else "run `harness init` (or export HARNESS_API_TOKEN=$(openssl rand -hex 32))"))
+                        "" if st.api_tokens else "run `penko init` (or export HARNESS_API_TOKEN=$(openssl rand -hex 32))"))
     checks.append(Check("model", OK, st.model + (f" (fallbacks: {', '.join(st.fallback_models)})" if st.fallback_models else "")))
     key = get_llm_key(st.model)
-    local = st.model.split("/")[0] in {"ollama", "ollama_chat"} or bool(os.environ.get("OPENAI_API_BASE"))
+    from core.cost import is_local
+
+    local = is_local(st.model) or bool(os.environ.get("OPENAI_API_BASE"))
     if key or local:
         checks.append(Check("provider key", OK, "found" if key else "not needed (local model)"))
     else:
         provider = st.model.split("/")[0]
         checks.append(Check("provider key", WARN, f"no key found for '{provider}' (LiteLLM may still find one in the environment)",
-                            f"run `harness init`, or export {provider.upper()}_API_KEY=..."))
+                            f"run `penko init`, or export {provider.upper()}_API_KEY=..."))
 
     try:
         agents = AgentRegistry()._agents
         checks.append(Check("agents", OK if agents else FAIL, f"{len(agents)} profile(s): {', '.join(sorted(agents))}" if agents
-                            else "no agent profiles found", "" if agents else "run `harness init` to create config/agents.yaml"))
+                            else "no agent profiles found", "" if agents else "run `penko init` to create config/agents.yaml"))
     except Exception as error:  # noqa: BLE001
         checks.append(Check("agents", FAIL, f"invalid agents.yaml: {error}", "fix the YAML or delete it to use the defaults"))
 
@@ -137,14 +139,14 @@ def collect(online: bool = False, port: int | None = None) -> list[Check]:
     telegram_ready = bool(os.environ.get("HARNESS_SECRET_TELEGRAM_BOT_TOKEN") and os.environ.get("HARNESS_SECRET_TELEGRAM_APPROVAL_CHAT_ID"))
     checks.append(Check("approvals", OK if telegram_ready else WARN,
                         "Telegram configured" if telegram_ready else "terminal prompt (when serving in a terminal) + API /approvals; no Telegram",
-                        "" if telegram_ready else "optional: `harness init` can configure Telegram"))
+                        "" if telegram_ready else "optional: `penko init` can configure Telegram"))
 
     p = port or st.api_port
     with socket.socket() as s:
         s.settimeout(0.3)
         busy = s.connect_ex((st.api_host if st.api_host != "0.0.0.0" else "127.0.0.1", p)) == 0
     checks.append(Check("port", WARN if busy else OK, f"{st.api_host}:{p} is {'in use' if busy else 'free'}",
-                        "stop the other process or use `harness serve --port N`" if busy else ""))
+                        "stop the other process or use `penko serve --port N`" if busy else ""))
 
     if online:
         try:
@@ -167,7 +169,7 @@ def render(checks: list[Check]) -> str:
             lines.append(f"     {theme.glyph('arrow')} {c.fix}")
     fails = sum(c.status == FAIL for c in checks)
     warns = sum(c.status == WARN for c in checks)
-    lines.append(f"\n{fails} problem(s), {warns} warning(s)." + ("" if fails else " Ready to go: `harness serve`."))
+    lines.append(f"\n{fails} problem(s), {warns} warning(s)." + ("" if fails else " Ready to go: `penko serve`."))
     return "\n".join(lines)
 
 

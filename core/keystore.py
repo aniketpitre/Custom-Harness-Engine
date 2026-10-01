@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 
-SERVICE = "harness-engine"
+SERVICE = "harness-engine"   # kept so existing keyring entries stay readable
 ITEMS_VAR = "HARNESS_KEYRING_ITEMS"
 _SECRET_NAME = re.compile(
     r"(_API_KEY|API_TOKENS?|_TOKEN|^HARNESS_WEBHOOK_SECRET|^HARNESS_RECEIPT_KEY|PASSWORD)$|^HARNESS_SECRET_",
@@ -68,7 +68,7 @@ def get(name: str) -> str | None:
 def set_secret(name: str, value: str) -> None:
     kr = _module()
     if kr is None:
-        raise RuntimeError('keyring is not installed: pip install "harness-engine[keyring]"')
+        raise RuntimeError('keyring is not installed: pip install "penko-perry[keyring]"')
     kr.set_password(SERVICE, name, value)
     if kr.get_password(SERVICE, name) != value:  # verify the write really happened
         raise RuntimeError("keyring did not store the secret")

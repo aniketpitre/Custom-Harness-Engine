@@ -1,8 +1,13 @@
-# Harness Engine
+<p align="center"><img src="docs/images/wordmark.svg" alt="Penko Perry" width="560"></p>
 
-**A general-purpose agent runtime that turns goals into *verified* outcomes, and can prove what it did.**
+<p align="center"><b>Policy-gated agents for DevOps that turn goals into <i>verified</i> outcomes, and can prove what they did.</b></p>
 
-Most agent frameworks optimise what an agent *can do*. Harness Engine optimises whether the agent
+<p align="center"><code>penko chat</code> · <code>penko run</code> · <code>penko serve</code> · <code>penko dashboard</code></p>
+
+> Penko Perry was called Harness Engine. The `harness` command still works as an alias, and settings keep their
+> `HARNESS_` prefix and `~/.harness` home so existing installs carry on unchanged.
+
+Most agent frameworks optimise what an agent *can do*. Penko Perry optimises whether the agent
 *actually accomplished the goal* - safely, observably, and with a tamper-evident record - while staying
 small and fast. DevOps/SRE (Kubernetes, ArgoCD, GitOps) is the first domain pack; the core is domain-neutral.
 
@@ -10,7 +15,7 @@ small and fast. DevOps/SRE (Kubernetes, ArgoCD, GitOps) is the first domain pack
 GOAL → CONTEXT → AGENT → POLICY → APPROVAL → EXECUTE → VERIFY → RECEIPT → LEARN → MEMORY
 ```
 
-- [Why Harness Engine](#why-harness-engine)
+- [Why Penko Perry](#why-penko-perry)
 - [Feature overview](#feature-overview)
 - [Architecture](#architecture)
 - [How a run works](#how-a-run-works)
@@ -24,7 +29,7 @@ GOAL → CONTEXT → AGENT → POLICY → APPROVAL → EXECUTE → VERIFY → RE
 
 ---
 
-## Why Harness Engine
+## Why Penko Perry
 
 The design goal is to keep the strengths of the well-known agents while fixing the things they leave to the
 user. Each point below is something the code enforces and the test suite checks - not a roadmap item.
@@ -71,7 +76,7 @@ user. Each point below is something the code enforces and the test suite checks 
 - Risk tiers **R0-R4**, deny-by-default, argument-aware risk functions, hard blocklist
 - Rules: `deny > ask > allow` with argument patterns (`deny:bash(git push --force*)`)
 - Taint tracking after untrusted content
-- Approval broker: live terminal prompt (in `harness serve` and `harness run` when stdin is a TTY, opt out with `HARNESS_TERMINAL_APPROVALS=off`), REST API and Telegram buttons all active at once, first answer wins, prompts asked one at a time; approver allowlist; timeout → deny
+- Approval broker: live terminal prompt (in `penko serve` and `penko run` when stdin is a TTY, opt out with `HARNESS_TERMINAL_APPROVALS=off`), REST API and Telegram buttons all active at once, first answer wins, prompts asked one at a time; approver allowlist; timeout → deny
 - Workspace confinement (symlink-safe, deny list for `.ssh`, `.aws`, `.kube`, `.env`, `secrets`), engine-source write protection
 - SSRF guard on every redirect hop; secret-stripped environments for all child processes
 - Shell command classifier (read-only pipelines auto-run, mutations ask, destructive commands are blocked) with optional `bwrap`/Docker sandbox
@@ -233,7 +238,7 @@ ASK → broker: args-hash bound, approver allowlist, timeout → deny
 
 ### Permission modes
 
-On top of the policy table, every run has a mode (`harness run --mode`, `permission_mode` on `POST /sessions`
+On top of the policy table, every run has a mode (`penko run --mode`, `permission_mode` on `POST /sessions`
 or in an agent profile, or `HARNESS_PERMISSION_MODE`):
 
 | Mode | Behaviour |
@@ -372,7 +377,7 @@ await engine.plugins.load(MyPlugin())            # transactional; same name = re
 Comparison is based on each project's public documentation at the time of writing (see
 [`docs/Harness_Engine_Audit.md`](docs/Harness_Engine_Audit.md) for sources). Where another agent is ahead, we say so.
 
-| | Harness Engine | Claude Code | OpenClaw | Hermes Agent | Pi | DeepSeek Harness |
+| | Penko Perry | Claude Code | OpenClaw | Hermes Agent | Pi | DeepSeek Harness |
 |---|---|---|---|---|---|---|
 | Primary focus | Verified, audited operations | Interactive coding | Personal assistant / channels | Self-improving assistant | Minimal coding agent | Plugin-based harness |
 | Tiered deny-by-default risk (R0-R4) | **Yes, argument-aware** | Rules + modes | Modes + allowlists | Pattern risk | No (containers) | Plugin |
@@ -392,7 +397,7 @@ Comparison is based on each project's public documentation at the time of writin
 | Interactive TUI / IDE integration | No (API + CLI) | **Yes** | Yes | Yes | **Yes** | Yes |
 | Kernel size | ~2,500 lines | closed | large | large | very small | plugin-based |
 
-**Where Harness Engine is different, on purpose.** It is an *operations* runtime: the things that make
+**Where Penko Perry is different, on purpose.** It is an *operations* runtime: the things that make
 production automation trustworthy - argument-aware policy, verified completion, audited receipts, GitOps-first
 changes, out-of-band approvals - are core features rather than extensions. **Where it is not the right tool:**
 if you want an interactive coding terminal, IDE integration, or a multi-channel chat assistant, the projects
@@ -402,46 +407,46 @@ above are more mature for that.
 
 ## Quick start
 
-**One command** (installs the `harness` command in an isolated environment via `uv`, `pipx` or a private venv;
+**One command** (installs the `penko` command in an isolated environment via `uv`, `pipx` or a private venv;
 needs Python 3.11+ or `uv`):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/aniketpitre/Custom-Harness-Engine/main/install.sh | sh
-harness init        # ~1 minute: provider, model, API key, generates the API token, optional Telegram
-harness doctor      # checks the install and prints the exact fix for anything missing
-harness chat        # interactive session in the terminal
-harness serve       # API + web dashboard on 127.0.0.1:8000
-harness dashboard   # open the dashboard, signed in
-harness run "List the files in the workspace"
+penko init        # ~1 minute: provider, model, API key, generates the API token, optional Telegram
+penko doctor      # checks the install and prints the exact fix for anything missing
+penko chat        # interactive session in the terminal
+penko serve       # API + web dashboard on 127.0.0.1:8000
+penko dashboard   # open the dashboard, signed in
+penko run "List the files in the workspace"
 ```
 
 Alternatives: `pipx install "harness-engine[runtime] @ git+https://github.com/aniketpitre/Custom-Harness-Engine.git"`,
-`uvx --from git+https://github.com/aniketpitre/Custom-Harness-Engine.git harness doctor`, or Docker (below).
+`uvx --from git+https://github.com/aniketpitre/Custom-Harness-Engine.git penko doctor`, or Docker (below).
 The installer needs no `git` (it installs the GitHub source archive) and accepts `HARNESS_SOURCE` (PyPI name, wheel,
 archive/git URL or local path) and `HARNESS_EXTRAS`.
 
-`harness init` writes everything to `~/.harness` (override with `HARNESS_HOME`): a mode-600 `.env` (provider key,
+`penko init` writes everything to `~/.harness` (override with `HARNESS_HOME`): a mode-600 `.env` (provider key,
 API token, optional Telegram), `config/agents.yaml` (yours to edit) and `data/` (database, checkpoints, skills).
-No Vault, Docker or database server is required; Vault is an optional secrets provider. `harness init` keeps secrets in your OS keyring when one is available (`--secret-store auto|keyring|file`), and falls back to the mode-600 `.env` on headless machines; there is deliberately no passphrase-encrypted file, since a key stored next to the file adds no protection.
+No Vault, Docker or database server is required; Vault is an optional secrets provider. `penko init` keeps secrets in your OS keyring when one is available (`--secret-store auto|keyring|file`), and falls back to the mode-600 `.env` on headless machines; there is deliberately no passphrase-encrypted file, since a key stored next to the file adds no protection.
 
 | Command | Purpose |
 |---|---|
-| `harness init` | First-run setup; idempotent (keeps your token and edited agents). `-y` with flags for scripts/CI: `--provider --model --api-key-env VAR --telegram-bot-token-env VAR ...` |
-| `harness doctor [--online] [--json]` | Checks Python, permissions (`.env` must be 600), token, model key, agents, database, `git`/`gh`/`kubectl`/`argocd`/`bwrap`, optional Python extras, port; `--online` makes a tiny model call. Exit code 1 on failures |
-| `harness serve [--host --port]` | Start the API (refuses to start without a token; warns on non-loopback binds) |
-| `harness chat [--agent --mode --model --max-cost --resume ID]` | Interactive multi-turn session: approvals inline, Ctrl+C stops a turn, `/help`, `/cost`, `/mode`, `/model`, `/tools`, `/theme`, `/new`. The whole chat is one durable, resumable session |
-| `harness dashboard [--print-url]` | Open the web dashboard served by `harness serve`, already signed in |
-| `harness run GOAL [--agent --mode --max-cost --output-format --approval-timeout --summary-file]` | One-shot, headless-friendly run (see [Headless and CI](#headless-and-ci)); stable exit codes |
-| `harness token` | Print the API token (for `curl`) |
-| `harness theme list\|show\|set NAME` | Terminal theme: `helm` (default), `harbor`, `ember`, `forest`, `midnight`, `mono`, or your own `~/.harness/skins/NAME.yaml` |
-| `harness secret list\|set NAME\|delete NAME` | Manage secrets in the OS keyring (macOS Keychain, Windows Credential Locker, Secret Service/KWallet); values are never printed |
-| `harness sessions [ID]` | Recent sessions (with cost) / one session |
-| `harness cost [--days N] [--by model\|agent\|day\|session] [--json]` | Tokens and USD spent, from the event log (subagents included) |
-| `harness approvals list\|approve\|deny ID` | Manage approvals on a running server |
-| `harness plugins` | Plugin states and tools |
+| `penko init` | First-run setup; idempotent (keeps your token and edited agents). `-y` with flags for scripts/CI: `--provider --model --api-key-env VAR --telegram-bot-token-env VAR ...` |
+| `penko doctor [--online] [--json]` | Checks Python, permissions (`.env` must be 600), token, model key, agents, database, `git`/`gh`/`kubectl`/`argocd`/`bwrap`, optional Python extras, port; `--online` makes a tiny model call. Exit code 1 on failures |
+| `penko serve [--host --port]` | Start the API (refuses to start without a token; warns on non-loopback binds) |
+| `penko chat [--agent --mode --model --max-cost --resume ID]` | Interactive multi-turn session: approvals inline, Ctrl+C stops a turn, `/help`, `/cost`, `/mode`, `/model`, `/tools`, `/theme`, `/new`. The whole chat is one durable, resumable session |
+| `penko dashboard [--print-url]` | Open the web dashboard served by `penko serve`, already signed in |
+| `penko run GOAL [--agent --mode --max-cost --output-format --approval-timeout --summary-file]` | One-shot, headless-friendly run (see [Headless and CI](#headless-and-ci)); stable exit codes |
+| `penko token` | Print the API token (for `curl`) |
+| `penko theme list\|show\|set NAME` | Terminal theme: `perry` (default: the platypus in deep pale green), `helm`, `harbor`, `ember`, `forest`, `midnight`, `mono`, or your own `~/.harness/skins/NAME.yaml` |
+| `penko secret list\|set NAME\|delete NAME` | Manage secrets in the OS keyring (macOS Keychain, Windows Credential Locker, Secret Service/KWallet); values are never printed |
+| `penko sessions [ID]` | Recent sessions (with cost) / one session |
+| `penko cost [--days N] [--by model\|agent\|day\|session] [--json]` | Tokens and USD spent, from the event log (subagents included) |
+| `penko approvals list\|approve\|deny ID` | Manage approvals on a running server |
+| `penko plugins` | Plugin states and tools |
 
 ```bash
-curl -s -H "Authorization: Bearer $(harness token)" -X POST localhost:8000/sessions \
+curl -s -H "Authorization: Bearer $(penko token)" -X POST localhost:8000/sessions \
      -d '{"agent_id":"devops_agent","goal":"List the files in the workspace","run":true}'
 ```
 
@@ -449,6 +454,27 @@ Development checkout: `pip install -e ".[dev]"`. Optional extras: `telegram`, `v
 `mcp`, `otel`, `setup`, `runtime` (all integrations).
 
 ---
+
+### Local models (LM Studio, Ollama)
+
+```bash
+# LM Studio: load a model with context length 16384+, start the server (Developer tab), then:
+penko init -y --provider lmstudio          # finds the loaded model, sets LM_STUDIO_API_BASE and a 16k context
+penko doctor --online
+penko chat --agent read_only_explorer --mode read-only
+```
+
+`--base-url http://other-mac.local:1234/v1` points at LM Studio on another machine; `--context-window` matches the
+length you loaded the model with. Local models cost $0 in `penko cost`. Small models (e.g. Qwen3 4B) work best in
+`read-only` or `plan` mode; add `/no_think` to a Qwen3 message for faster answers.
+
+## Brand
+
+![Penko Perry in the terminal](docs/images/terminal-banner.png)
+
+Penko Perry's mascot is an original pixel-art platypus in deep pale green (`#5f9579`, deep `#2f5c48`, pale
+`#c4dfd0`). One pixel grid in `core/brand.py` produces the logo (`docs/images/logo.svg`), the wordmark, the dashboard
+mark and the terminal banner; regenerate the files with `python -m core.brand`.
 
 ## Configuration
 
@@ -467,7 +493,7 @@ Config files are looked up in `$HARNESS_HOME/config/`, then `./config/` (checkou
 | `HARNESS_SANDBOX` | `none` / `bwrap` / `docker` for `bash` | `none` |
 | `HARNESS_TOKEN_BUDGET`, `HARNESS_MAX_TURNS`, `HARNESS_MAX_SECONDS` | Run limits | `200000` / `30` / `3600` |
 | `HARNESS_PERMISSION_MODE` | Default permission mode: `default`, `plan`, `read-only`, `strict` | `default` |
-| `HARNESS_MAX_COST_USD` | USD ceiling per run, subagents included (also `max_cost_usd` per agent, `harness run --max-cost`); `0` = no limit | `0` |
+| `HARNESS_MAX_COST_USD` | USD ceiling per run, subagents included (also `max_cost_usd` per agent, `penko run --max-cost`); `0` = no limit | `0` |
 | `HARNESS_PRICES` | Price overrides, USD per million tokens: `{"my/model": {"input": 0.5, "output": 1.5}}`. Local models are free; models without a price are reported as *unpriced* | LiteLLM's bundled map |
 | `HARNESS_CONTEXT_WINDOW`, `HARNESS_RESERVE_TOKENS`, `HARNESS_KEEP_RECENT_TOKENS` | Compaction | `128000` / `16384` / `20000` |
 | `HARNESS_LLM_TIMEOUT`, `HARNESS_LLM_RETRIES`, `HARNESS_STREAM` | Model calls | `120` / `3` / `true` |
@@ -479,7 +505,7 @@ Config files are looked up in `$HARNESS_HOME/config/`, then `./config/` (checkou
 | `HARNESS_DB_PATH`, `HARNESS_DATA_DIR` | SQLite location, data directory | `$HARNESS_HOME/data/memory.db`, `$HARNESS_HOME/data/` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Enable tracing | unset |
 
-Agents are declared in `~/.harness/config/agents.yaml` (created by `harness init`):
+Agents are declared in `~/.harness/config/agents.yaml` (created by `penko init`):
 
 ```yaml
 - id: sre
@@ -530,9 +556,9 @@ Stream event types: `message_delta`, `message`, `tool_call`, `tool_result`, `int
 
 ### Terminal theme
 
-The CLI has a DevOps look: a ship's-wheel mascot, themed status marks (✅ ⚠️ ❌), risk markers on approvals
-(🟢 R0, 🟡 R1, 🟠 R2, 🔴 R3, ⛔ R4), live tool progress on stderr during `harness run`, and DevOps spinner verbs. Pick
-a skin with `harness theme set ember` (on-call orange) or write your own YAML that extends one:
+The CLI wears the Penko Perry look: the pixel platypus in deep pale green (theme `perry`), themed status marks (✅ ⚠️ ❌), risk markers on approvals
+(🟢 R0, 🟡 R1, 🟠 R2, 🔴 R3, ⛔ R4), live tool progress on stderr during `penko run`, and DevOps spinner verbs. Pick
+a skin with `penko theme set ember` (on-call orange) or `helm` (the original blue ship's wheel) or write your own YAML that extends one:
 
 ```yaml
 # ~/.harness/skins/acme.yaml
@@ -547,7 +573,7 @@ Styling shows only on an interactive terminal; piped output, `--json` and receip
 
 ## Web dashboard
 
-`harness serve` also serves a dashboard at `http://127.0.0.1:8000/ui` (`harness dashboard` opens it signed in).
+`penko serve` also serves a dashboard at `http://127.0.0.1:8000/ui` (`penko dashboard` opens it signed in).
 It has no build step and no third-party code: three static files in `core/ui/`, served with a strict
 Content-Security-Policy, talking only to the same API with your token.
 
@@ -567,12 +593,12 @@ as text, never as HTML. The token lives in the tab's session storage unless you 
 
 ## Headless and CI
 
-`harness run` is built for scripts:
+`penko run` is built for scripts:
 
 ```bash
-harness run "Summarise failing pods in staging" --mode read-only --output-format json --max-cost 0.25
-echo "Check the rollout" | harness run - --output-format stream-json      # JSONL events, then the result
-harness run --goal-file task.md --output-format text --approval-timeout 0  # nobody to approve: deny instead of waiting
+penko run "Summarise failing pods in staging" --mode read-only --output-format json --max-cost 0.25
+echo "Check the rollout" | penko run - --output-format stream-json      # JSONL events, then the result
+penko run --goal-file task.md --output-format text --approval-timeout 0  # nobody to approve: deny instead of waiting
 ```
 
 | `--output-format` | Output |
@@ -646,7 +672,7 @@ core/primitives/      pydantic models: Goal, ContextPacket, Evidence, Policy, Ac
 domains/generic/      fs, web, shell
 domains/devops/       kubectl, ArgoCD, GitOps (worktree), snapshots, risk table, skills
 core/defaults/        packaged defaults: agents.yaml, settings.yaml, *.example (mcp, hooks)
-cli/                  the `harness` command (init, serve, run, doctor, ...)
+cli/                  the `penko` command (init, serve, run, doctor, ...)
 install.sh            one-command installer (uv / pipx / private venv)
 docs/                 design docs, audit, IMPLEMENTATION_STATUS.md, references
 tests/                unit, integration and live tests

@@ -13,7 +13,7 @@
 cp .env.example .env && chmod 600 .env && $EDITOR .env     # or run ./start.sh to generate it
 docker compose up --build -d
 curl -H "Authorization: Bearer $HARNESS_API_TOKEN" http://127.0.0.1:8000/agents
-docker compose run --rm harness harness run "List the files in the workspace"
+docker compose run --rm harness penko run "List the files in the workspace"
 ```
 
 Vault dev mode is **not persistent and not for production**. Production: an external Vault with TLS,

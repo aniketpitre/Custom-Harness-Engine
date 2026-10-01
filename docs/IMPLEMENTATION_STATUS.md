@@ -55,24 +55,24 @@ C7 persistent cron, heartbeat, list/pause/delete - done. C8 `AGENTS.md` - done.
 
 | Item | Status |
 |---|---|
-| `harness` command (`init`, `serve`, `run`, `doctor`, `token`, `sessions`, `approvals`, `plugins`, `version`) | Done (`cli/main.py`) |
+| `penko` command (`init`, `serve`, `run`, `doctor`, `token`, `sessions`, `approvals`, `plugins`, `version`) | Done (`cli/main.py`) |
 | Defaults packaged in the wheel; per-user config in `~/.harness` (`HARNESS_HOME`) | Done (`core/home.py`, `core/defaults/`); the old `config/` directory moved |
-| No Vault/Docker needed: mode-600 `.env` written by `harness init`, Vault optional; secrets go to the OS keyring (`core/keystore.py`, `harness secret`, `--secret-store`) with a mode-600 file fallback | Done |
-| `harness doctor` with per-check fixes and exit codes | Done (`cli/doctor.py`) |
+| No Vault/Docker needed: mode-600 `.env` written by `penko init`, Vault optional; secrets go to the OS keyring (`core/keystore.py`, `penko secret`, `--secret-store`) with a mode-600 file fallback | Done |
+| `penko doctor` with per-check fixes and exit codes | Done (`cli/doctor.py`) |
 | One-line installer (`install.sh`: uv → pipx → private venv; git/PyPI/wheel/path sources) | Done; tested with dry runs and a real clean-venv install |
 | Wheel built, installed into an empty directory and run from another cwd | Covered by `tests/test_install_and_cli.py::TestWheel` |
 | Publish to PyPI / GHCR on tag | Workflow written and validated (`.github/workflows/release.yml`); first real release needs the one-time PyPI trusted-publisher setup, until then install from the git URL |
-| DevOps terminal theme: mascot, six skins, user YAML skins, themed doctor/approvals/live tool status; plain when piped | Done (`core/theme.py`, `harness theme`, `tests/test_theme.py`) |
+| DevOps terminal theme: mascot, six skins, user YAML skins, themed doctor/approvals/live tool status; plain when piped | Done (`core/theme.py`, `penko theme`, `tests/test_theme.py`) |
 
 ## Phase E1 (usability and operations)
 
 | Item | Status | Where / test |
 |---|---|---|
-| Cost accounting: per-call USD events, USD budget (`HARNESS_MAX_COST_USD`, `max_cost_usd`), `harness cost`, `GET /usage`, `GET /sessions` | Done | `core/cost.py`, `tests/test_cost.py` |
+| Cost accounting: per-call USD events, USD budget (`HARNESS_MAX_COST_USD`, `max_cost_usd`), `penko cost`, `GET /usage`, `GET /sessions` | Done | `core/cost.py`, `tests/test_cost.py` |
 | Permission modes: `plan` (read-only until the plan is approved via `exit_plan_mode`), `read-only`, `strict` | Done | `core/modes.py`, `tests/test_modes.py` |
 | Headless contract: `--output-format json\|stream-json\|text`, exit codes 0/1/2/3, `--summary-file`, `--approval-timeout`; GitHub Action | Done; the action's shell step is executed in tests with a fake model | `core/headless.py`, `action.yml`, `tests/test_headless.py` |
-| `harness chat`: multi-turn REPL, inline approvals, Ctrl+C stops a turn, slash commands, resume | Done | `cli/chat.py`, `tests/test_chat.py` |
-| Web dashboard at `/ui` (+ `harness dashboard`) | Done; checked in headless Chromium against a live server (light, dark, phone width) | `core/ui/`, `tests/test_dashboard.py` |
+| `penko chat`: multi-turn REPL, inline approvals, Ctrl+C stops a turn, slash commands, resume | Done | `cli/chat.py`, `tests/test_chat.py` |
+| Web dashboard at `/ui` (+ `penko dashboard`) | Done; checked in headless Chromium against a live server (light, dark, phone width) | `core/ui/`, `tests/test_dashboard.py` |
 
 What is left, compared with other agents and current industry practice, is in `docs/ROADMAP.md` (phases E1 to E4).
 Control-by-control security mapping: `docs/OWASP_AGENTIC_MAPPING.md`.
@@ -85,5 +85,5 @@ Control-by-control security mapping: `docs/OWASP_AGENTIC_MAPPING.md`.
 - No cost accounting (tokens only) and no multi-channel chat gateway.
 - Docker and the live tests could not be exercised in the build environment; compose/Dockerfile are validated statically.
 
-- Approvals with no setup: done. Terminal prompt in `harness serve`/`run`, chained with API and Telegram (first answer wins); see `core/gateway/channels.py`, `tests/test_terminal_approvals.py`.
+- Approvals with no setup: done. Terminal prompt in `penko serve`/`run`, chained with API and Telegram (first answer wins); see `core/gateway/channels.py`, `tests/test_terminal_approvals.py`.
 - Release automation: done, `.github/workflows/release.yml` (tag → tests → wheel/sdist → PyPI trusted publishing → multi-arch GHCR image → GitHub release), checked by `tests/test_release_workflow.py`. It has not run against real PyPI/GHCR; the one-time PyPI trusted-publisher and `pypi` environment setup is yours.

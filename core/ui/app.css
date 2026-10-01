@@ -1,17 +1,17 @@
 :root {
   color-scheme: light;
-  --page: #f9f9f7;
-  --surface: #fcfcfb;
-  --surface-2: #f3f2ef;
+  --page: #f3f7f4;
+  --surface: #fcfdfc;
+  --surface-2: #e8f1ec;
   --ink: #0b0b0b;
   --ink-2: #52514e;
   --muted: #898781;
   --grid: #e1e0d9;
   --axis: #c3c2b7;
   --ring: rgba(11, 11, 11, 0.10);
-  --brand: #2a78d6;
+  --brand: #3d7a5f;
   --brand-ink: #ffffff;
-  --series-1: #2a78d6;
+  --series-1: #3d7a5f;
   --good: #0ca30c;
   --good-ink: #006300;
   --warning: #fab219;
@@ -25,16 +25,16 @@
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
     color-scheme: dark;
-    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321; --ink: #ffffff; --ink-2: #c3c2b7;
+    --page: #0c120f; --surface: #16201b; --surface-2: #1f2b25; --ink: #ffffff; --ink-2: #c3c2b7;
     --muted: #898781; --grid: #2c2c2a; --axis: #383835; --ring: rgba(255, 255, 255, 0.10);
-    --brand: #3987e5; --series-1: #3987e5; --good-ink: #0ca30c; --code: #262624;
+    --brand: #7fbf9f; --series-1: #6fae8f; --brand-ink: #10241b; --good-ink: #0ca30c; --code: #262624;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321; --ink: #ffffff; --ink-2: #c3c2b7;
+  --page: #0c120f; --surface: #16201b; --surface-2: #1f2b25; --ink: #ffffff; --ink-2: #c3c2b7;
   --muted: #898781; --grid: #2c2c2a; --axis: #383835; --ring: rgba(255, 255, 255, 0.10);
-  --brand: #3987e5; --series-1: #3987e5; --good-ink: #0ca30c; --code: #262624;
+  --brand: #7fbf9f; --series-1: #6fae8f; --brand-ink: #10241b; --good-ink: #0ca30c; --code: #262624;
 }
 
 * { box-sizing: border-box; }
@@ -59,9 +59,8 @@ h2 { font-size: 15px; margin: 0 0 10px; font-weight: 650; }
         flex-direction: column; gap: 16px; position: sticky; top: 0; height: 100vh; }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; padding: 0 8px; }
 .brand.big { font-size: 22px; padding: 0; margin-bottom: 8px; }
-.wheel { width: 20px; height: 20px; border-radius: 50%; border: 3px solid var(--brand); position: relative;
-         flex: none; }
-.wheel::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: var(--brand); }
+.logo { height: 22px; width: auto; image-rendering: pixelated; flex: none; }
+.brand.big .logo { height: 34px; }
 nav { display: flex; flex-direction: column; gap: 2px; }
 nav a { color: var(--ink-2); padding: 7px 10px; border-radius: 8px; display: flex; align-items: center;
         justify-content: space-between; }

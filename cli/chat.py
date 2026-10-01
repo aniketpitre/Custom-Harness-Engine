@@ -1,4 +1,4 @@
-"""`harness chat`: an interactive, multi-turn session on the same engine, policy and event log as every run.
+"""`penko chat`: an interactive, multi-turn session on the same engine, policy and event log as every run.
 
 Each message you type becomes a turn in one durable session, so the whole conversation is resumable
 (`--resume ID`), searchable and tamper-evident like any other run. Approvals appear inline; Ctrl+C stops the
@@ -23,7 +23,7 @@ COMMANDS = {
     "/model [NAME]": "show or switch the model for the next turns",
     "/tools": "tools this agent can use in the current mode",
     "/theme [NAME]": "show or switch the terminal theme",
-    "/session": "show the session id (resume later with `harness chat --resume ID`)",
+    "/session": "show the session id (resume later with `penko chat --resume ID`)",
     "/new": "start a fresh session",
     "/exit": "leave (Ctrl+D also works)",
 }

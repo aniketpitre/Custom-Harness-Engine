@@ -28,7 +28,7 @@ def init_tracing(endpoint: str | None = None) -> None:
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
         provider = TracerProvider(
-            resource=Resource.create({"service.name": "harness-engine", "service.version": "0.2.0"})
+            resource=Resource.create({"service.name": "penko-perry", "service.version": __import__("core").__version__})
         )
         provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
         trace.set_tracer_provider(provider)

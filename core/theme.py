@@ -2,8 +2,8 @@
 
 Styling only ever appears on an interactive terminal. Piped or redirected output, `--json`, and anything a
 script might parse stay plain, so receipts and the doctor JSON never contain escape codes. Built-in skins
-live here; drop a YAML file in `$HARNESS_HOME/skins/<name>.yaml` to add your own (it inherits every key
-you leave out from `helm`). Choose one with `harness theme set NAME` or `HARNESS_THEME=NAME`.
+live here (the default is `perry`, the Penko Perry platypus in deep pale green); drop a YAML file in
+`$HARNESS_HOME/skins/<name>.yaml` to add your own (it inherits every key you leave out from `perry`). Choose one with `penko theme set NAME` or `HARNESS_THEME=NAME`.
 
 Environment: NO_COLOR disables colour, HARNESS_COLOR=always|never|auto, HARNESS_ASCII=1 disables emoji,
 HARNESS_PLAIN=1 disables all styling.
@@ -17,7 +17,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 RESET = "\033[0m"
-_ANSI = {"bold": "1", "dim": "2", "red": "31", "green": "32", "yellow": "33", "blue": "34", "magenta": "35",
+_ANSI = {"perry": "38;5;72", "perry-pale": "38;5;151", "perry-deep": "38;5;29", "bold": "1", "dim": "2", "red": "31", "green": "32", "yellow": "33", "blue": "34", "magenta": "35",
          "cyan": "36", "white": "37", "orange": "38;5;208", "teal": "38;5;37", "forest": "38;5;71",
          "gold": "38;5;178", "slate": "38;5;103", "violet": "38;5;141", "crimson": "38;5;160"}
 
@@ -60,7 +60,16 @@ def _skin(name: str, description: str, tagline: str, brand: str, mascot: str, **
                    glyphs={**HELM.glyphs, "mascot": mascot, **glyphs})
 
 
+PERRY = replace(
+    HELM, name="perry", description="Penko Perry: deep pale green, the platypus (default)", tagline="policy-gated agents for DevOps",
+    colors={**HELM.colors, "brand": "perry", "accent": "bold+perry-pale"},
+    glyphs={**HELM.glyphs, "mascot": "🌿", "run": "🌿"},
+    verbs=("paddling upstream", "reconciling", "rolling out", "sniffing the logs", "tracing the request",
+           "diffing manifests", "checking rollout health", "diving for root causes", "verifying the result",
+           "tightening the policy", "waiting on the pipeline"))
+
 BUILTIN: dict[str, Skin] = {
+    "perry": PERRY,
     "helm": HELM,
     "harbor": _skin("harbor", "Container ship: teal and gold, for release day", "ship it, safely", "teal", "🚢",
                     run="⚓"),
@@ -94,7 +103,7 @@ def _load_user_skin(name: str) -> Skin | None:
         return None
     if not isinstance(raw, dict):
         return None
-    base = BUILTIN.get(str(raw.get("extends", "helm")), HELM)
+    base = BUILTIN.get(str(raw.get("extends", "perry")), PERRY)
     verbs = raw.get("verbs")
     return replace(
         base, name=name, description=str(raw.get("description", base.description)),
@@ -115,12 +124,12 @@ def available() -> dict[str, Skin]:
 
 
 def current_name() -> str:
-    return os.environ.get("HARNESS_THEME", "").strip().lower() or "helm"
+    return os.environ.get("HARNESS_THEME", "").strip().lower() or "perry"
 
 
 def current() -> Skin:
     name = current_name()
-    return _load_user_skin(name) or BUILTIN.get(name, HELM)
+    return _load_user_skin(name) or BUILTIN.get(name, PERRY)
 
 
 # -- capability detection -----------------------------------------------------------------------
@@ -188,22 +197,39 @@ def verb() -> str:
 
 
 def banner(version: str, stream=None) -> str:
-    """The wheel mascot with the version and tagline. Empty when output is not a terminal."""
+    """The mascot with the product name, version and tagline. Empty when output is not a terminal."""
+    from core import brand
+
     stream = stream or sys.stdout
     if not styled(stream):
         return ""
     skin = current()
+    side = [f"{brand.NAME} {version}", skin.tagline, f"theme: {skin.name} · `{brand.COMMAND} --help`"]
+    if skin.name in {"perry", "mono"} or skin.glyphs.get("mascot") == PERRY.glyphs["mascot"]:
+        art = brand.terminal_art(color=use_color(stream) and skin.name != "mono")
+        width = max(len(_strip(a)) for a in art)
+        side = [""] + side
+        lines = [a + " " * (width - len(_strip(a))) + "   "
+                 + (paint(t, "accent", stream) if i == 1 else paint(t, "dim", stream) if i == 3 else t)
+                 for i, (a, t) in enumerate(zip(art, side + [""] * len(art), strict=False))]
+        return "\n".join(line.rstrip() for line in lines) + "\n"
     mascot = glyph("mascot", stream).strip()
-    title = f"harness {version}" + (f" {mascot}" if mascot else "")
-    side = [title, skin.tagline, f"theme: {skin.name}"]
+    title = side[0] + (f" {mascot}" if mascot else "")
+    side[0] = title
     lines = []
     for art, text in zip(BANNER_ART, side + [""] * len(BANNER_ART), strict=False):
         lines.append(paint(art, "brand", stream) + "  " + (paint(text, "accent", stream) if text == title else text))
     return "\n".join(lines) + "\n"
 
 
+def _strip(text: str) -> str:
+    import re
+
+    return re.sub(r"\033\[[0-9;]*m", "", text)
+
+
 def preview(skin: Skin, stream=None) -> str:
-    """One sample of what a skin looks like, used by `harness theme list --preview`."""
+    """One sample of what a skin looks like, used by `penko theme list --preview`."""
     stream = stream or sys.stdout
     marks = " ".join(paint(skin.glyphs.get(k, "").strip() or k, role, stream, skin)
                      for k, role in (("ok", "ok"), ("warn", "warn"), ("fail", "fail")))

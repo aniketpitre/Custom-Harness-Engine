@@ -3,10 +3,10 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "harness-engine"
+name = "penko-perry"
 dynamic = ["version"]
 requires-python = ">=3.11"
-description = "Policy-gated agent runtime that turns goals into verified, audited outcomes"
+description = "Penko Perry: a policy-gated agent runtime for DevOps that turns goals into verified, audited outcomes"
 readme = "README.md"
 # Core runtime only. Domain packs and integrations are optional extras and import lazily.
 dependencies = [
@@ -23,7 +23,8 @@ dependencies = [
 ]
 
 [project.scripts]
-harness = "cli.main:main"
+penko = "cli.main:main"
+harness = "cli.main:main"   # original command, kept as an alias
 
 [project.optional-dependencies]
 telegram = ["python-telegram-bot>=21.0"]
@@ -33,8 +34,8 @@ devops = ["kubernetes", "GitPython"]
 mcp = ["mcp"]
 otel = ["opentelemetry-exporter-otlp", "opentelemetry-instrumentation-litellm"]
 setup = ["questionary"]
-runtime = ["harness-engine[telegram,vault,devops,mcp,otel]"]
-dev = ["pytest", "pytest-asyncio", "ruff", "harness-engine[runtime,setup,keyring]"]
+runtime = ["penko-perry[telegram,vault,devops,mcp,otel]"]
+dev = ["pytest", "pytest-asyncio", "ruff", "penko-perry[runtime,setup,keyring]"]
 
 [tool.setuptools.dynamic]
 version = {attr = "core.__version__"}

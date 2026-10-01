@@ -147,9 +147,9 @@ class TestDoctor:
 
     def test_fresh_install_reports_missing_token_with_the_fix(self, capsys):
         checks = self._by_name(doctor.collect())
-        assert checks["api token"].status == "fail" and "harness init" in checks["api token"].fix
+        assert checks["api token"].status == "fail" and "penko init" in checks["api token"].fix
         assert main(["doctor"]) == 1
-        assert "harness init" in capsys.readouterr().out
+        assert "penko init" in capsys.readouterr().out
 
     def test_ready_after_init(self, capsys, monkeypatch):
         main(["init", "-y", "--provider", "groq", "--api-key", "k"])
@@ -181,7 +181,7 @@ class TestDoctor:
         monkeypatch.setattr(doctor.importlib.util, "find_spec", lambda m: None)
         checks = self._by_name(doctor.collect())
         assert checks["kubectl"].status == checks["python:telegram"].status == "warn"
-        assert 'pip install "harness-engine[telegram]"' == checks["python:telegram"].fix
+        assert 'pip install "penko-perry[telegram]"' == checks["python:telegram"].fix
 
     def test_online_check(self, monkeypatch):
         install_llm(monkeypatch, [msg("OK")])
@@ -283,13 +283,13 @@ class TestServeRunAndFriends:
 
     def test_approvals_unreachable_api_message(self, monkeypatch, capsys):
         assert main(["approvals", "list", "--url", "http://127.0.0.1:1"]) == 1
-        assert "harness serve" in capsys.readouterr().err
+        assert "penko serve" in capsys.readouterr().err
 
     def test_plugins_and_version(self, capsys):
         assert main(["plugins"]) == 0
         out = capsys.readouterr().out
         assert "fs" in out and "ACTIVE" in out and "FAILED" not in out
-        assert main(["version"]) == 0 and f"harness-engine {__version__}" in capsys.readouterr().out
+        assert main(["version"]) == 0 and f"penko-perry {__version__}" in capsys.readouterr().out
 
     def test_every_subcommand_is_documented_in_help(self):
         parser = build_parser()
@@ -302,7 +302,7 @@ def installed(tmp_path_factory):
     base = tmp_path_factory.mktemp("wheel")
     subprocess.run([sys.executable, "-m", "pip", "wheel", "--no-deps", "--no-build-isolation", "-q", str(ROOT),
                     "-w", str(base / "w")], check=True, capture_output=True, cwd=base)
-    wheel = next((base / "w").glob("harness_engine-*.whl"))
+    wheel = next((base / "w").glob("penko_perry-*.whl"))
     target = base / "site"
     subprocess.run([sys.executable, "-m", "pip", "install", "--no-deps", "-q", "--target", str(target), str(wheel)],
                    check=True, capture_output=True)
@@ -329,7 +329,9 @@ class TestWheel:
                          "domains/devops/skills/argocd-status-check/SKILL.md", "cli/main.py", "core/plugins/dyn_runner.py"):
             assert expected in names, expected
         ep = next(n for n in names if n.endswith("entry_points.txt"))
-        assert "harness = cli.main:main" in zipfile.ZipFile(wheel).read(ep).decode()
+        scripts = zipfile.ZipFile(wheel).read(ep).decode()
+        assert "penko = cli.main:main" in scripts and "harness = cli.main:main" in scripts   # new name + alias
+        assert "core/ui/logo.svg" in names and "core/brand.py" in names
         assert not [n for n in names if n.startswith(("tests/", "docs/"))]
 
     def test_installed_copy_runs_from_another_directory(self, installed, tmp_path):
@@ -354,7 +356,7 @@ class TestWheel:
         script = target / "bin" / "harness"
         assert script.exists()
         out = subprocess.run([str(script), "version"], cwd=cwd, env=env, capture_output=True, text=True)
-        assert out.returncode == 0 and "harness-engine" in out.stdout
+        assert out.returncode == 0 and "penko-perry" in out.stdout
 
 
 class TestInstallScript:
@@ -381,19 +383,54 @@ class TestInstallScript:
 
     def test_prefers_uv_then_pipx_then_private_venv(self, tmp_path):
         out = self._run(tmp_path, ["uv", "pipx", "python3"]).stdout
-        assert out.startswith("uv tool install --force") and "harness-engine[runtime,keyring] @ https://github.com/aniketpitre/Custom-Harness-Engine/archive/refs/heads/main.tar.gz" in out
+        assert out.startswith("uv tool install --force") and "penko-perry[runtime,keyring] @ https://github.com/aniketpitre/Custom-Harness-Engine/archive/refs/heads/main.tar.gz" in out
         assert self._run(tmp_path / "b", ["pipx", "python3"]).stdout.startswith("pipx install --force")
         venv = self._run(tmp_path / "c", ["python3"], {"HARNESS_VENV": str(tmp_path / "v")}).stdout
-        assert "-m venv" in venv and 'pip" install "harness-engine[runtime,keyring] @' in venv and ".local/bin/harness" in venv
+        assert "-m venv" in venv and 'pip" install "penko-perry[runtime,keyring] @' in venv and ".local/bin/penko" in venv and ".local/bin/harness" in venv
 
     def test_sources_and_extras(self, tmp_path):
-        pypi = self._run(tmp_path, ["uv"], {"HARNESS_SOURCE": "harness-engine", "HARNESS_EXTRAS": "telegram,vault"}).stdout
-        assert '"harness-engine[telegram,vault]"' in pypi
-        bare = self._run(tmp_path / "b", ["uv"], {"HARNESS_SOURCE": "harness-engine", "HARNESS_EXTRAS": ""}).stdout
-        assert '"harness-engine"' in bare
+        pypi = self._run(tmp_path, ["uv"], {"HARNESS_SOURCE": "penko-perry", "HARNESS_EXTRAS": "telegram,vault"}).stdout
+        assert '"penko-perry[telegram,vault]"' in pypi
+        bare = self._run(tmp_path / "b", ["uv"], {"HARNESS_SOURCE": "penko-perry", "HARNESS_EXTRAS": ""}).stdout
+        assert '"penko-perry"' in bare
         local = self._run(tmp_path / "c", ["uv"], {"HARNESS_SOURCE": str(ROOT)}).stdout
         assert f"@ file://{ROOT}" in local
 
     def test_no_python_gives_a_helpful_message(self, tmp_path):
         r = self._run(tmp_path, [])
         assert r.returncode == 1 and "Python 3.11+" in r.stdout and "astral.sh/uv" in r.stdout
+
+
+class TestLMStudio:
+    def test_init_lmstudio_detects_the_loaded_model(self, monkeypatch, capsys):
+        import cli.main as m
+        from cli.main import main
+
+        monkeypatch.setattr(m, "_lmstudio_models", lambda base: ["qwen/qwen3-4b", "text-embedding-nomic"][:1])
+        assert main(["init", "-y", "--provider", "lmstudio", "--secret-store", "file"]) == 0
+        env = home.parse_env(home.env_file().read_text())
+        assert env["HARNESS_MODEL"] == "lm_studio/qwen/qwen3-4b"
+        assert env["LM_STUDIO_API_BASE"] == "http://localhost:1234/v1" and env["HARNESS_CONTEXT_WINDOW"] == "16384"
+        assert "LM Studio is serving: qwen/qwen3-4b" in capsys.readouterr().out
+
+    def test_init_lmstudio_not_running_still_configures(self, monkeypatch, capsys):
+        import cli.main as m
+        from cli.main import main
+
+        monkeypatch.setattr(m, "_lmstudio_models", lambda base: [])
+        assert main(["init", "-y", "--provider", "lmstudio", "--secret-store", "file",
+                     "--base-url", "http://mac-mini.local:1234/v1", "--context-window", "32768"]) == 0
+        env = home.parse_env(home.env_file().read_text())
+        assert env["LM_STUDIO_API_BASE"] == "http://mac-mini.local:1234/v1" and env["HARNESS_CONTEXT_WINDOW"] == "32768"
+        assert "not answering" in capsys.readouterr().err
+
+    def test_lm_studio_is_local_and_free(self):
+        from cli.doctor import collect
+        from core.cost import cost_usd
+
+        assert cost_usd("lm_studio/qwen/qwen3-4b", 10**6, 10**6) == 0.0
+        import os
+
+        os.environ["HARNESS_MODEL"] = "lm_studio/qwen/qwen3-4b"
+        check = next(c for c in collect() if c.name == "provider key")
+        assert check.status == "ok" and "local" in check.detail

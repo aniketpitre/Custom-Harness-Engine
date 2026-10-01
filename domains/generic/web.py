@@ -28,7 +28,7 @@ async def fetch(url: str, allow: tuple[str, ...] = ()) -> tuple[int, str, str]:
     import httpx
 
     async with httpx.AsyncClient(timeout=15, follow_redirects=False,
-                                 headers={"User-Agent": "harness-engine/0.2"}) as client:
+                                 headers={"User-Agent": "penko-perry/0.3"}) as client:
         for _ in range(MAX_REDIRECTS + 1):
             check_url(url, allow)
             async with client.stream("GET", url) as resp:
