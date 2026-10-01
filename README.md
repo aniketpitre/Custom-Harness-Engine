@@ -15,7 +15,7 @@ GOAL → CONTEXT → AGENT → POLICY → APPROVAL → EXECUTE → VERIFY → RE
 ## Get started
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/aniketpitre/Custom-Harness-Engine/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/aniketpitre/PenkoPerry-Harness/main/install.sh | sh
 penko init                 # pick a provider and model, paste a key (or point at LM Studio / Ollama / your own server)
 penko doctor --online      # checks everything and makes one tiny model call
 penko chat                 # talk to the agent in your terminal; approvals appear inline
@@ -428,11 +428,11 @@ above are more mature for that.
 Python 3.11+ or `uv`):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/aniketpitre/Custom-Harness-Engine/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/aniketpitre/PenkoPerry-Harness/main/install.sh | sh
 ```
 
-Alternatives: `pipx install "penko-perry[runtime] @ git+https://github.com/aniketpitre/Custom-Harness-Engine.git"`,
-`uvx --from git+https://github.com/aniketpitre/Custom-Harness-Engine.git penko doctor`, or Docker (below). The
+Alternatives: `pipx install "penko-perry[runtime] @ git+https://github.com/aniketpitre/PenkoPerry-Harness.git"`,
+`uvx --from git+https://github.com/aniketpitre/PenkoPerry-Harness.git penko doctor`, or Docker (below). The
 installer needs no `git` and accepts `PENKO_SOURCE` (PyPI name, wheel, archive/git URL or local path) and
 `PENKO_EXTRAS`.
 
@@ -694,7 +694,7 @@ approvals, writes the job summary, and exposes `status`, `outcome`, `exit-code`,
 `result-file`. A complete PR-review workflow is in [`docs/examples/penko-pr-review.yml`](docs/examples/penko-pr-review.yml).
 
 ```yaml
-- uses: aniketpitre/Custom-Harness-Engine@v0.3.0   # pin a tag or SHA
+- uses: aniketpitre/PenkoPerry-Harness@v0.3.0   # pin a tag or SHA
   with:
     goal: Review the changed Kubernetes manifests for risky settings.
     model: groq/openai/gpt-oss-120b
@@ -733,7 +733,7 @@ tests, and a cold-import test proving heavy optional packages are not imported a
 `git tag v0.2.1 && git push origin v0.2.1` runs `.github/workflows/release.yml`: it checks the tag equals
 `core/__version__.py`, runs lint and tests, builds the wheel and sdist (`twine check`), publishes to PyPI with
 trusted publishing (no token stored), pushes a multi-arch (amd64 + arm64) image to
-`ghcr.io/aniketpitre/custom-harness-engine`, and creates a GitHub release. One-time setup on your side: create a
+`ghcr.io/aniketpitre/penkoperry-harness`, and creates a GitHub release. One-time setup on your side: create a
 `pypi` environment in the repo settings and add the project as a trusted publisher on pypi.org.
 
 ## Project layout

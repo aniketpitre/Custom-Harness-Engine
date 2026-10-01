@@ -1,12 +1,12 @@
 #!/bin/sh
 # One-command installer for Penko Perry.
-#   curl -fsSL https://raw.githubusercontent.com/aniketpitre/Custom-Harness-Engine/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/aniketpitre/PenkoPerry-Harness/main/install.sh | sh
 # Installs the `penko` command in an isolated environment (uv, else pipx, else a private venv).
 # Override the source with PENKO_SOURCE (a PyPI name, wheel, archive/git URL, or local path). PENKO_EXTRAS picks extras.
 set -eu
 
 # Default: the GitHub source archive (no git needed). Until a PyPI release exists this is the way to install.
-SOURCE="${PENKO_SOURCE:-${HARNESS_SOURCE:-https://github.com/aniketpitre/Custom-Harness-Engine/archive/refs/heads/main.tar.gz}}"
+SOURCE="${PENKO_SOURCE:-${HARNESS_SOURCE:-https://github.com/aniketpitre/PenkoPerry-Harness/archive/refs/heads/main.tar.gz}}"
 EXTRAS="${PENKO_EXTRAS-${HARNESS_EXTRAS-runtime,keyring}}"
 if [ -n "$EXTRAS" ]; then BRACKET="[$EXTRAS]"; else BRACKET=""; fi
 case "$SOURCE" in

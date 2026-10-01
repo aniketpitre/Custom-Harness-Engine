@@ -15,4 +15,4 @@ config/settings.local.yaml
 config/mcp.yaml
 config/hooks.yaml
 # Local full workspace backups
-Custom-Harness-Engine-full-backup-*.zip
+*-full-backup-*.zip

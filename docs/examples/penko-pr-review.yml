@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: penko
-        uses: aniketpitre/Custom-Harness-Engine@main      # pin a release tag or commit SHA in real use
+        uses: aniketpitre/PenkoPerry-Harness@main      # pin a release tag or commit SHA in real use
         with:
           goal: >
             Review the Kubernetes manifests and Helm values changed in this repository for risky settings
