@@ -4,7 +4,7 @@
 
 Read-only architecture audit prompt for Claude Code.
 
-Compare the current Custom Harness Engine at `/root/Harness-Engine` against:
+Compare the current Penko Perry codebase against:
 
 **A Programming Paradigm for Spatiotemporal Composability**  
 Authors: Yifan Shi, Wei Zhang  
