@@ -1,4 +1,4 @@
-"""One settings object: environment > $HARNESS_HOME/config/settings.yaml > packaged defaults.
+"""One settings object: environment > ~/.penko/config/settings.yaml > packaged defaults.
 
 `settings()` is cheap and re-reads the environment on every call, so tests and
 operators can change behaviour without restarting the process.

@@ -181,7 +181,7 @@ class Chat:
                 self.turn(line)
         finally:
             self.close()
-        self.say(f"Session {self.session_id} saved. Resume with: harness chat --resume {self.session_id}", "dim")
+        self.say(f"Session {self.session_id} saved. Resume with: penko chat --resume {self.session_id}", "dim")
         return 0
 
     def turn(self, text: str) -> None:
@@ -237,7 +237,7 @@ class Chat:
     def render(self, ev: dict) -> str | None:
         t = ev.get("type")
         if t == "message":
-            self.say(f"{theme.paint('harness', 'brand', self.out)} {self.g('arrow')} {ev['content']}")
+            self.say(f"{theme.paint('perry', 'brand', self.out)} {self.g('arrow')} {ev['content']}")
         elif t == "tool_call":
             args = ", ".join(f"{k}={str(v)[:60]}" for k, v in (ev.get("arguments") or {}).items())
             self.say(f"  {self.g('tool')} {ev['name']}({args})", "dim")

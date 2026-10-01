@@ -70,8 +70,8 @@ def test_init_stores_secrets_in_the_keyring_not_in_the_env_file(kr, capsys):
                  "--telegram-bot-token", "123:abc", "--telegram-chat-id", "42"]) == 0
     out = capsys.readouterr().out
     text = home.env_file().read_text()
-    assert "gsk-very-secret" not in text and "123:abc" not in text and "HARNESS_API_TOKEN=" not in text
-    assert "HARNESS_MODEL=groq/m" in text and "=42" not in text
+    assert "gsk-very-secret" not in text and "123:abc" not in text and "PENKO_API_TOKEN=" not in text
+    assert "PENKO_MODEL=groq/m" in text and "HARNESS_" not in text and "=42" not in text
     items = home.keyring_items()
     assert {"GROQ_API_KEY", "HARNESS_API_TOKEN", "HARNESS_SECRET_TELEGRAM_BOT_TOKEN"} <= set(items)
     assert kr.data[(keystore.SERVICE, "GROQ_API_KEY")] == "gsk-very-secret"
@@ -106,7 +106,7 @@ def test_token_command_reads_from_the_keyring(kr, capsys):
 
 def test_rerun_keeps_token_and_migrates_a_file_install_into_the_keyring(kr, monkeypatch):
     main(["init", "-y", "--provider", "groq", "--api-key", "k1", "--secret-store", "file"])
-    token = home.parse_env(home.env_file().read_text())["HARNESS_API_TOKEN"]
+    token = home._read_env_file()["HARNESS_API_TOKEN"]
     monkeypatch.delenv("HARNESS_API_TOKEN", raising=False)
     main(["init", "-y", "--provider", "groq", "--secret-store", "keyring"])
     text = home.env_file().read_text()
@@ -119,7 +119,7 @@ def test_moving_back_to_the_file_brings_secrets_along(kr, monkeypatch):
     token = kr.data[(keystore.SERVICE, "HARNESS_API_TOKEN")]
     monkeypatch.delenv("HARNESS_API_TOKEN", raising=False)
     main(["init", "-y", "--provider", "groq", "--secret-store", "file"])
-    values = home.parse_env(home.env_file().read_text())
+    values = home._read_env_file()
     assert values["HARNESS_API_TOKEN"] == token and values["GROQ_API_KEY"] == "k1" and "HARNESS_KEYRING_ITEMS" not in values
 
 
@@ -193,7 +193,7 @@ class TestDoctorSecretStore:
         main(["init", "-y", "--provider", "groq", "--api-key", "k"])
         del kr.data[(keystore.SERVICE, "GROQ_API_KEY")]
         c = self._check()
-        assert c.status == "fail" and "GROQ_API_KEY" in c.detail and "harness secret set GROQ_API_KEY" in c.fix
+        assert c.status == "fail" and "GROQ_API_KEY" in c.detail and "penko secret set GROQ_API_KEY" in c.fix
 
     def test_keyring_configured_but_unavailable(self, kr):
         from keyring.backends.fail import Keyring as Fail
@@ -218,3 +218,42 @@ class TestDoctorSecretStore:
             assert self._check().status == "ok"
         finally:
             keyring.set_keyring(previous)
+
+
+def test_env_file_uses_penko_names_and_reads_older_files(monkeypatch):
+    """The .env is written with PENKO_* names; a file with the older prefix still loads."""
+    import os
+
+    home.ensure_home()
+    home.env_file().write_text("HARNESS_MODEL=old/model\nHARNESS_MAX_TURNS=7\nPENKO_MAX_TURNS=9\n")
+    for k in ("HARNESS_MODEL", "HARNESS_MAX_TURNS"):
+        monkeypatch.delenv(k, raising=False)
+    home.load_env()
+    assert os.environ["HARNESS_MODEL"] == "old/model" and os.environ["HARNESS_MAX_TURNS"] == "9"   # PENKO_ wins
+    home.write_env({"HARNESS_APPROVERS": "cli:me"})
+    text = home.env_file().read_text()
+    assert "PENKO_MODEL=old/model" in text and "PENKO_APPROVERS=cli:me" in text and "HARNESS_" not in text
+
+
+def test_penko_variables_in_the_shell_are_honoured(monkeypatch):
+    import os
+
+    from core import _apply_env_aliases
+    from core.settings import settings
+
+    monkeypatch.setenv("PENKO_MAX_TURNS", "4")
+    _apply_env_aliases()
+    assert settings().max_turns == 4
+    monkeypatch.delenv("PENKO_MAX_TURNS")
+    os.environ.pop("HARNESS_MAX_TURNS", None)
+
+
+def test_default_home_is_dot_penko(monkeypatch, tmp_path):
+    monkeypatch.delenv("HARNESS_HOME", raising=False)
+    monkeypatch.delenv("PENKO_HOME", raising=False)
+    monkeypatch.setattr(home.Path, "home", lambda: tmp_path)
+    assert home.harness_home() == tmp_path / ".penko"
+    (tmp_path / ".harness").mkdir()          # an existing older install keeps its data
+    assert home.harness_home() == tmp_path / ".harness"
+    (tmp_path / ".penko").mkdir()
+    assert home.harness_home() == tmp_path / ".penko"

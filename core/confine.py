@@ -126,7 +126,7 @@ def safe_env(extra_allow: tuple[str, ...] = (), extra: dict[str, str] | None = N
     for name, value in os.environ.items():
         if name in extra_allow:
             env[name] = value
-        elif name.startswith(("VAULT_", "HARNESS_")) or _SECRET_ENV.search(name):
+        elif name.startswith(("VAULT_", "HARNESS_", "PENKO_")) or _SECRET_ENV.search(name):
             continue
         else:
             env[name] = value

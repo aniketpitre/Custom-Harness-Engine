@@ -320,3 +320,14 @@ class TestApiAuthFailsClosed:
         c = TestClient(api.app)
         r = c.get("/agents", headers={"Authorization": "Bearer default_unsafe_token_change_me"})
         assert r.status_code == 503
+
+
+def test_children_never_inherit_penko_settings(monkeypatch):
+    """The API token and every other PENKO_* setting stay out of shell commands and self-written tools."""
+    from core.confine import safe_env
+
+    monkeypatch.setenv("PENKO_API_TOKEN", "secret-token")
+    monkeypatch.setenv("PENKO_MODEL", "groq/x")
+    monkeypatch.setenv("HARNESS_API_TOKEN", "secret-token")
+    env = safe_env()
+    assert not [k for k in env if k.startswith(("PENKO_", "HARNESS_"))]

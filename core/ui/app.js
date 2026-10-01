@@ -485,7 +485,7 @@
   }
 
   // -- boot -----------------------------------------------------------------------------------
-  // `harness dashboard` passes the token in the URL fragment, which browsers never send to a server
+  // `penko dashboard` passes the token in the URL fragment, which browsers never send to a server
   function consumeFragment() {
     if (!location.hash.startsWith("#token=")) return false;
     const tok = new URLSearchParams(location.hash.slice(1)).get("token");

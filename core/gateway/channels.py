@@ -27,7 +27,7 @@ def start_telegram(broker: ApprovalBroker) -> TelegramChannel | None:
 
 
 def terminal_enabled() -> bool:
-    """A live prompt is offered when stdin is a TTY, unless HARNESS_TERMINAL_APPROVALS turns it off."""
+    """A live prompt is offered when stdin is a TTY, unless PENKO_TERMINAL_APPROVALS turns it off."""
     import os
 
     if os.getenv("HARNESS_TERMINAL_APPROVALS", "").strip().lower() in {"0", "false", "no", "off"}:

@@ -23,6 +23,7 @@ _PROVIDER_ENV = {
     "nvidia_nim": "NVIDIA_API_KEY",
     "gemini": "GEMINI_API_KEY",
     "deepseek": "DEEPSEEK_API_KEY",
+    "mistral": "MISTRAL_API_KEY",
 }
 
 

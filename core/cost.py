@@ -1,6 +1,6 @@
 """USD cost of model calls: LiteLLM's bundled price map, overridable per model.
 
-Prices come from `HARNESS_PRICES` (JSON), then `prices:` in settings.yaml, then LiteLLM's map. Both overrides
+Prices come from `PENKO_PRICES` (JSON), then `prices:` in settings.yaml, then LiteLLM's map. Both overrides
 use USD per million tokens: {"my/model": {"input": 0.5, "output": 1.5}}. Local models (ollama, lm_studio,
 vllm, llamafile) cost nothing. Anything else without a price is counted as *unpriced*, never silently as free,
 so the budget check and reports can say so.
@@ -39,7 +39,7 @@ def _overrides() -> dict[str, Price]:
         try:
             raw.update(json.loads(env))
         except ValueError:
-            log.warning("HARNESS_PRICES is not valid JSON; ignored")
+            log.warning("PENKO_PRICES is not valid JSON; ignored")
     out = {}
     for model, p in raw.items():
         try:

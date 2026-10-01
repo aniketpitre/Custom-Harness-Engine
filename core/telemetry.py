@@ -48,8 +48,8 @@ def get_tracer(name: str = "harness"):
 
 
 _meter = metrics.get_meter("harness")
-run_counter = _meter.create_counter("harness_agent_run_count", description="Agent runs")
+run_counter = _meter.create_counter("penko_agent_run_count", description="Agent runs")
 policy_counter = _meter.create_counter(
     "resolve_policy_decision_count", description="Policy decisions by outcome"
 )
-tool_counter = _meter.create_counter("harness_tool_call_count", description="Tool calls")
+tool_counter = _meter.create_counter("penko_tool_call_count", description="Tool calls")

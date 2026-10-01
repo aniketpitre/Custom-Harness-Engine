@@ -2,29 +2,29 @@
 
 ## 1. Configure
 
-`penko init` writes `~/.harness/.env` (mode 600) and `~/.harness/config/agents.yaml`. Everything is configured
-with environment variables (`HARNESS_*`), optionally `~/.harness/config/settings.yaml` (`model.primary`,
+`penko init` writes `~/.penko/.env` (mode 600) and `~/.penko/config/agents.yaml`. Everything is configured
+with environment variables (`PENKO_*`), optionally `~/.penko/config/settings.yaml` (`model.primary`,
 `model.fallback`, `otel.endpoint`). Precedence: real environment → `.env` → settings.yaml → packaged defaults.
 Secrets come from the environment/`.env` first, then the OS keyring (`penko secret`), then Vault (optional). Run `penko doctor` after any change.
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `HARNESS_API_TOKEN` | Bearer token for the API. **Required** (no default). Extra scoped tokens: `HARNESS_API_TOKENS='{"tok": ["sessions:read"]}'` | - |
-| `HARNESS_MODEL`, `HARNESS_FALLBACK_MODELS` | LiteLLM model and failover chain | `groq/openai/gpt-oss-120b` |
-| `HARNESS_WORKSPACE` | The only directory file/shell tools may touch | current directory |
-| `HARNESS_APPROVERS` | Allowed approver ids, e.g. `telegram:123,api:*` | any member of the approval chat |
-| `HARNESS_APPROVAL_TIMEOUT` | Seconds before an unanswered approval is denied | 300 |
-| `HARNESS_GITOPS_REPOS` | Repositories the agent may open PRs against | the workspace |
-| `HARNESS_STAGING_APPS` | ArgoCD app globs treated as staging (R2); all others are R3 | none |
-| `HARNESS_SANDBOX` | `none` / `bwrap` / `docker` for the bash tool (fails closed if unavailable) | `none` |
-| `HARNESS_TOKEN_BUDGET`, `HARNESS_MAX_TURNS`, `HARNESS_MAX_SECONDS` | Run limits | 200000 / 30 / 3600 |
-| `HARNESS_MAX_COST_USD` | USD ceiling per run, subagents included (also `max_cost_usd` per agent, `penko run --max-cost`); `0` = no limit | `0` |
-| `HARNESS_PRICES` | Price overrides, USD per million tokens: `{"my/model": {"input": 0.5, "output": 1.5}}`. Local models are free; models without a price are reported as *unpriced* | LiteLLM's bundled map |
-| `HARNESS_CONTEXT_WINDOW`, `HARNESS_KEEP_RECENT_TOKENS` | Compaction thresholds | 128000 / 20000 |
-| `HARNESS_RECEIPT_KEY` | HMAC key for the event-log hash chain | unset (plain SHA-256) |
-| `HARNESS_WEBHOOK_ENDPOINTS`, `HARNESS_WEBHOOK_SECRET` | Signed completion webhooks | none |
+| `PENKO_API_TOKEN` | Bearer token for the API. **Required** (no default). Extra scoped tokens: `PENKO_API_TOKENS='{"tok": ["sessions:read"]}'` | - |
+| `PENKO_MODEL`, `PENKO_FALLBACK_MODELS` | LiteLLM model and failover chain | `groq/openai/gpt-oss-120b` |
+| `PENKO_WORKSPACE` | The only directory file/shell tools may touch | current directory |
+| `PENKO_APPROVERS` | Allowed approver ids, e.g. `telegram:123,api:*` | any member of the approval chat |
+| `PENKO_APPROVAL_TIMEOUT` | Seconds before an unanswered approval is denied | 300 |
+| `PENKO_GITOPS_REPOS` | Repositories the agent may open PRs against | the workspace |
+| `PENKO_STAGING_APPS` | ArgoCD app globs treated as staging (R2); all others are R3 | none |
+| `PENKO_SANDBOX` | `none` / `bwrap` / `docker` for the bash tool (fails closed if unavailable) | `none` |
+| `PENKO_TOKEN_BUDGET`, `PENKO_MAX_TURNS`, `PENKO_MAX_SECONDS` | Run limits | 200000 / 30 / 3600 |
+| `PENKO_MAX_COST_USD` | USD ceiling per run, subagents included (also `max_cost_usd` per agent, `penko run --max-cost`); `0` = no limit | `0` |
+| `PENKO_PRICES` | Price overrides, USD per million tokens: `{"my/model": {"input": 0.5, "output": 1.5}}`. Local models are free; models without a price are reported as *unpriced* | LiteLLM's bundled map |
+| `PENKO_CONTEXT_WINDOW`, `PENKO_KEEP_RECENT_TOKENS` | Compaction thresholds | 128000 / 20000 |
+| `PENKO_RECEIPT_KEY` | HMAC key for the event-log hash chain | unset (plain SHA-256) |
+| `PENKO_WEBHOOK_ENDPOINTS`, `PENKO_WEBHOOK_SECRET` | Signed completion webhooks | none |
 
-## 2. Agents (`~/.harness/config/agents.yaml`)
+## 2. Agents (`~/.penko/config/agents.yaml`)
 
 ```yaml
 - id: sre
@@ -44,9 +44,9 @@ Project instructions: put an `AGENTS.md` in the workspace (scanned for injection
 ## 3. Use it
 
 ```bash
-curl -s -H "Authorization: Bearer $HARNESS_API_TOKEN" -X POST localhost:8000/sessions \
+curl -s -H "Authorization: Bearer $PENKO_API_TOKEN" -X POST localhost:8000/sessions \
   -d '{"agent_id":"sre","goal":"Why is checkout returning 502?","run":true}'
-curl -N -H "Authorization: Bearer $HARNESS_API_TOKEN" localhost:8000/sessions/<id>/stream
+curl -N -H "Authorization: Bearer $PENKO_API_TOKEN" localhost:8000/sessions/<id>/stream
 ```
 
 Approvals arrive on Telegram (buttons: approve once / approve for session / deny) or via `GET /approvals` and
@@ -54,8 +54,8 @@ Approvals arrive on Telegram (buttons: approve once / approve for session / deny
 
 ## 4. Extend it
 
-- **MCP servers:** copy `core/defaults/mcp.yaml.example` (in a checkout) to `~/.harness/config/mcp.yaml`. Tools become `mcp__<server>__<tool>`.
-- **Hooks:** `~/.harness/config/hooks.yaml` (see `core/defaults/hooks.yaml.example`). A `pre_tool` hook may deny/ask or rewrite arguments (exit code 2 blocks);
+- **MCP servers:** copy `core/defaults/mcp.yaml.example` (in a checkout) to `~/.penko/config/mcp.yaml`. Tools become `mcp__<server>__<tool>`.
+- **Hooks:** `~/.penko/config/hooks.yaml` (see `core/defaults/hooks.yaml.example`). A `pre_tool` hook may deny/ask or rewrite arguments (exit code 2 blocks);
   a `stop` hook can force the agent to continue (this is how you enforce a verification step).
 - **Plugins:** subclass `core.plugins.base.Plugin`, register tools/hooks/services in `register(ctx)`, load with
   `engine.plugins.load(...)`. Reload and unload are transactional.

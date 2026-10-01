@@ -1,6 +1,6 @@
-# Example: a read-only Harness review of every pull request, with a spend cap.
+# Example: a read-only Penko Perry review of every pull request, with a spend cap.
 # Copy to .github/workflows/ in your repository and add the provider key as a secret.
-name: harness-review
+name: penko-review
 on: pull_request
 
 permissions:
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - id: harness
+      - id: penko
         uses: aniketpitre/Custom-Harness-Engine@main      # pin a release tag or commit SHA in real use
         with:
           goal: >
@@ -22,4 +22,4 @@ jobs:
           max-cost: "0.50"
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      - run: echo "Harness spent ${{ steps.harness.outputs.cost-usd }} USD (${{ steps.harness.outputs.outcome }})"
+      - run: echo "Penko Perry spent ${{ steps.penko.outputs.cost-usd }} USD (${{ steps.penko.outputs.outcome }})"

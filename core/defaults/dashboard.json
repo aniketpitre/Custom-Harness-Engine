@@ -27,7 +27,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
         {
-          "expr": "sum(rate(harness_agent_run_count[1h])) * 3600",
+          "expr": "sum(rate(penko_agent_run_count[1h])) * 3600",
           "legendFormat": "Runs"
         }
       ]

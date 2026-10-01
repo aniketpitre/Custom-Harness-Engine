@@ -80,7 +80,7 @@ class TestInit:
         code = main(["init", "-y", "--provider", "groq", "--api-key-env", "MY_KEY", "--model", "groq/test-model"])
         out = capsys.readouterr().out
         assert code == 0
-        env = home.parse_env(home.env_file().read_text())
+        env = home._read_env_file()
         assert env["GROQ_API_KEY"] == "sk-secret-value" and env["HARNESS_MODEL"] == "groq/test-model"
         assert len(env["HARNESS_API_TOKEN"]) == 64
         assert home.env_file().stat().st_mode & 0o777 == 0o600
@@ -90,26 +90,51 @@ class TestInit:
 
     def test_init_is_idempotent_and_keeps_token_and_custom_agents(self, monkeypatch):
         main(["init", "-y", "--provider", "groq", "--api-key", "k1"])
-        first = home.parse_env(home.env_file().read_text())["HARNESS_API_TOKEN"]
+        first = home._read_env_file()["HARNESS_API_TOKEN"]
         agents = home.harness_home() / "config" / "agents.yaml"
         agents.write_text("- id: custom\n  domain: d\n  system_prompt: p\n")
         monkeypatch.delenv("HARNESS_API_TOKEN", raising=False)
         main(["init", "-y", "--provider", "openai", "--api-key", "k2", "--model", "openai/gpt-x"])
-        env = home.parse_env(home.env_file().read_text())
+        env = home._read_env_file()
         assert env["HARNESS_API_TOKEN"] == first and env["GROQ_API_KEY"] == "k1" and env["OPENAI_API_KEY"] == "k2"
         assert env["HARNESS_MODEL"] == "openai/gpt-x" and "custom" in agents.read_text()
 
     def test_unknown_provider_and_local_provider(self, capsys):
         with pytest.raises(SystemExit):
             main(["init", "-y", "--provider", "bogus"])
-        assert main(["init", "-y", "--provider", "local", "--base-url", "http://localhost:11434/v1"]) == 0
-        env = home.parse_env(home.env_file().read_text())
-        assert env["OPENAI_API_BASE"] == "http://localhost:11434/v1" and env["HARNESS_MODEL"].startswith("ollama_chat/")
+        assert main(["init", "-y", "--provider", "local", "--base-url", "http://gpu-box:11434"]) == 0   # alias of ollama
+        env = home._read_env_file()
+        assert env["OLLAMA_API_BASE"] == "http://gpu-box:11434" and env["HARNESS_MODEL"].startswith("ollama_chat/")
+
+    def test_custom_openai_compatible_endpoint(self, capsys):
+        assert main(["init", "-y", "--provider", "custom", "--model", "llama-3.3-70b"]) == 2
+        assert "needs --base-url" in capsys.readouterr().err
+        assert main(["init", "-y", "--provider", "custom", "--base-url", "http://vllm:8000/v1", "--model", "llama-3.3-70b",
+                     "--secret-store", "file"]) == 0
+        env = home._read_env_file()
+        assert env["HARNESS_MODEL"] == "openai/llama-3.3-70b" and env["OPENAI_API_BASE"] == "http://vllm:8000/v1"
+        assert env["OPENAI_API_KEY"] == "not-needed"
+        main(["init", "-y", "--provider", "custom", "--base-url", "https://gw.example/v1", "--model", "openai/x",
+              "--api-key", "sk-1", "--secret-store", "file"])
+        assert home._read_env_file()["OPENAI_API_KEY"] == "sk-1"
+
+    @pytest.mark.parametrize("provider,key,prefix", [("gemini", "GEMINI_API_KEY", "gemini/"),
+                                                     ("deepseek", "DEEPSEEK_API_KEY", "deepseek/"),
+                                                     ("mistral", "MISTRAL_API_KEY", "mistral/")])
+    def test_more_hosted_providers(self, provider, key, prefix):
+        assert main(["init", "-y", "--provider", provider, "--api-key", "k", "--secret-store", "file"]) == 0
+        env = home._read_env_file()
+        assert env[key] == "k" and env["HARNESS_MODEL"].startswith(prefix)
+        from core.secrets import get_llm_key
+
+        import os
+        os.environ[key] = "k"
+        assert get_llm_key(env["HARNESS_MODEL"]) == "k"
 
     def test_telegram_settings_are_stored_for_the_secret_chain(self):
         main(["init", "-y", "--provider", "groq", "--api-key", "k", "--telegram-bot-token", "123:abc",
               "--telegram-chat-id", "42", "--approver", "telegram:7", "--no-agents"])
-        env = home.parse_env(home.env_file().read_text())
+        env = home._read_env_file()
         assert env["HARNESS_APPROVERS"] == "telegram:7"
         from core.secrets import get_secret
 
@@ -128,7 +153,7 @@ class TestInit:
         monkeypatch.setattr("getpass.getpass", lambda prompt="": "sk-typed")
         monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
         assert main(["init"]) == 0
-        env = home.parse_env(home.env_file().read_text())
+        env = home._read_env_file()
         assert env["ANTHROPIC_API_KEY"] == "sk-typed" and env["HARNESS_MODEL"] == "anthropic/my-model"
 
     def test_token_command(self, capsys):
@@ -154,7 +179,7 @@ class TestDoctor:
     def test_ready_after_init(self, capsys, monkeypatch):
         main(["init", "-y", "--provider", "groq", "--api-key", "k"])
         capsys.readouterr()
-        monkeypatch.setenv("HARNESS_API_TOKEN", home.parse_env(home.env_file().read_text())["HARNESS_API_TOKEN"])
+        monkeypatch.setenv("HARNESS_API_TOKEN", home._read_env_file()["HARNESS_API_TOKEN"])
         checks = self._by_name(doctor.collect())
         assert checks["api token"].status == checks["provider key"].status == checks["agents"].status == "ok"
         assert checks["database"].status == "ok" and "wal" in checks["database"].detail
@@ -386,7 +411,7 @@ class TestInstallScript:
         assert out.startswith("uv tool install --force") and "penko-perry[runtime,keyring] @ https://github.com/aniketpitre/Custom-Harness-Engine/archive/refs/heads/main.tar.gz" in out
         assert self._run(tmp_path / "b", ["pipx", "python3"]).stdout.startswith("pipx install --force")
         venv = self._run(tmp_path / "c", ["python3"], {"HARNESS_VENV": str(tmp_path / "v")}).stdout
-        assert "-m venv" in venv and 'pip" install "penko-perry[runtime,keyring] @' in venv and ".local/bin/penko" in venv and ".local/bin/harness" in venv
+        assert "-m venv" in venv and 'pip" install "penko-perry[runtime,keyring] @' in venv and ".local/bin/penko" in venv
 
     def test_sources_and_extras(self, tmp_path):
         pypi = self._run(tmp_path, ["uv"], {"HARNESS_SOURCE": "penko-perry", "HARNESS_EXTRAS": "telegram,vault"}).stdout
@@ -408,7 +433,7 @@ class TestLMStudio:
 
         monkeypatch.setattr(m, "_lmstudio_models", lambda base: ["qwen/qwen3-4b", "text-embedding-nomic"][:1])
         assert main(["init", "-y", "--provider", "lmstudio", "--secret-store", "file"]) == 0
-        env = home.parse_env(home.env_file().read_text())
+        env = home._read_env_file()
         assert env["HARNESS_MODEL"] == "lm_studio/qwen/qwen3-4b"
         assert env["LM_STUDIO_API_BASE"] == "http://localhost:1234/v1" and env["HARNESS_CONTEXT_WINDOW"] == "16384"
         assert "LM Studio is serving: qwen/qwen3-4b" in capsys.readouterr().out
@@ -420,7 +445,7 @@ class TestLMStudio:
         monkeypatch.setattr(m, "_lmstudio_models", lambda base: [])
         assert main(["init", "-y", "--provider", "lmstudio", "--secret-store", "file",
                      "--base-url", "http://mac-mini.local:1234/v1", "--context-window", "32768"]) == 0
-        env = home.parse_env(home.env_file().read_text())
+        env = home._read_env_file()
         assert env["LM_STUDIO_API_BASE"] == "http://mac-mini.local:1234/v1" and env["HARNESS_CONTEXT_WINDOW"] == "32768"
         assert "not answering" in capsys.readouterr().err
 

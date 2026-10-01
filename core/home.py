@@ -1,9 +1,12 @@
-"""The Harness home directory: per-user config, secrets file and data (default ~/.harness).
+"""The Penko Perry home directory: per-user config, secrets file and data (default ~/.penko, or $PENKO_HOME).
 
 Layout:
-  $HARNESS_HOME/.env            secrets and settings written by `penko init` (mode 600)
-  $HARNESS_HOME/config/         user overrides: agents.yaml, settings.yaml, mcp.yaml, hooks.yaml
-  $HARNESS_HOME/data/           SQLite database, spilled outputs, checkpoints, skills, dynamic tools
+  ~/.penko/.env            settings and secrets written by `penko init` (mode 600), as PENKO_* variables
+  ~/.penko/config/         user overrides: agents.yaml, settings.yaml, mcp.yaml, hooks.yaml
+  ~/.penko/data/           SQLite database, spilled outputs, checkpoints, skills, dynamic tools
+
+Internally every setting is read through one canonical prefix (HARNESS_*); `.env` files are written with the
+public PENKO_ prefix and both spellings are read, so older files keep working.
 
 Config lookup order for `find_config(name)`: home -> ./config (working directory, for checkouts) ->
 the defaults packaged with the wheel (core/defaults).
@@ -17,8 +20,24 @@ from pathlib import Path
 DEFAULTS_DIR = Path(__file__).resolve().parent / "defaults"
 
 
+PUBLIC_PREFIX, INTERNAL_PREFIX = "PENKO_", "HARNESS_"
+
+
+def public_name(key: str) -> str:
+    """PENKO_X for an internal HARNESS_X setting name; other names (GROQ_API_KEY...) unchanged."""
+    return PUBLIC_PREFIX + key[len(INTERNAL_PREFIX):] if key.startswith(INTERNAL_PREFIX) else key
+
+
+def internal_name(key: str) -> str:
+    return INTERNAL_PREFIX + key[len(PUBLIC_PREFIX):] if key.startswith(PUBLIC_PREFIX) else key
+
+
 def harness_home() -> Path:
-    return Path(os.environ.get("HARNESS_HOME") or Path.home() / ".harness").expanduser()
+    explicit = os.environ.get("PENKO_HOME") or os.environ.get("HARNESS_HOME")
+    if explicit:
+        return Path(explicit).expanduser()
+    home, legacy = Path.home() / ".penko", Path.home() / ".harness"
+    return legacy if legacy.is_dir() and not home.exists() else home
 
 
 def find_config(name: str) -> Path:
@@ -65,16 +84,26 @@ def keyring_items(values: dict[str, str] | None = None) -> list[str]:
 
 
 def _read_env_file() -> dict[str, str]:
+    """The .env with keys in their internal form (PENKO_X is read as HARNESS_X)."""
     path = env_file()
-    return parse_env(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    raw = parse_env(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    out: dict[str, str] = {}
+    for key, value in raw.items():
+        if key.startswith(INTERNAL_PREFIX) and internal_name(public_name(key)) in out:
+            continue          # the PENKO_ spelling wins over an older duplicate
+        if internal_name(key) == "HARNESS_KEYRING_ITEMS":
+            value = ",".join(internal_name(n.strip()) for n in value.split(",") if n.strip())
+        out[internal_name(key)] = value
+    return out
 
 
 def load_env(override: bool = False) -> list[str]:
-    """Load $HARNESS_HOME/.env, then any secrets kept in the OS keyring, into os.environ.
+    """Load ~/.penko/.env, then any secrets kept in the OS keyring, into os.environ.
 
     Real environment variables always win (unless `override`). Returns the keys that were set."""
-    from core import keystore
+    from core import _apply_env_aliases, keystore
 
+    _apply_env_aliases()
     file_values = _read_env_file()
     set_keys = []
     for key, value in file_values.items():
@@ -118,7 +147,12 @@ def write_env(values: dict[str, str], store: str = "file") -> Path:
 def _write_file(values: dict[str, str]) -> Path:
     """Atomically write the .env with mode 600."""
     path = env_file()
-    body = "# Written by `penko init`. Keep private (mode 600).\n" + "".join(f"{k}={v}\n" for k, v in values.items())
+    def shown(key: str, value: str) -> str:
+        if key == "HARNESS_KEYRING_ITEMS":
+            value = ",".join(public_name(n) for n in value.split(",") if n)
+        return f"{public_name(key)}={value}\n"
+
+    body = "# Written by `penko init`. Keep private (mode 600).\n" + "".join(shown(k, v) for k, v in values.items())
     tmp = path.with_suffix(".tmp")
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
@@ -132,6 +166,7 @@ def delete_secret(name: str) -> bool:
     """Remove a value from the .env and/or the keyring. Returns whether anything was removed."""
     from core import keystore
 
+    name = internal_name(name)
     values = _read_env_file()
     items = set(keyring_items(values))
     removed = values.pop(name, None) is not None
@@ -145,6 +180,7 @@ def delete_secret(name: str) -> bool:
     if removed:
         _write_file(values)
         os.environ.pop(name, None)
+        os.environ.pop(public_name(name), None)
     return removed
 
 

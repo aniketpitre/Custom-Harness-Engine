@@ -13,7 +13,7 @@ os.environ["HARNESS_HOME"] = "/nonexistent-harness-home"  # never read a real ~/
 def isolated_env(tmp_path, monkeypatch):
     """Every test gets its own DB, data dir and workspace; no Vault, no real tokens."""
     saved = dict(os.environ)                       # code under test (e.g. `harness init`) may set os.environ
-    for key in [k for k in os.environ if k.startswith(("HARNESS_", "VAULT_"))]:
+    for key in [k for k in os.environ if k.startswith(("HARNESS_", "PENKO_", "VAULT_"))]:
         monkeypatch.delenv(key, raising=False)
     for key in ("GROQ_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OTEL_EXPORTER_OTLP_ENDPOINT"):
         monkeypatch.delenv(key, raising=False)

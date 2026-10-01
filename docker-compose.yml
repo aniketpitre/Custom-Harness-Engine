@@ -20,7 +20,7 @@ services:
       start_period: 5s
 
   # Seeds secrets with the dev root token, then mints a least-privilege read-only token for the
-  # harness. The harness never receives the root token or the raw provider key.
+  # Penko Perry. It never receives the root token or the raw provider key.
   vault-init:
     image: hashicorp/vault:1.20
     depends_on:
@@ -34,13 +34,13 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_APPROVAL_CHAT_ID: ${TELEGRAM_APPROVAL_CHAT_ID:-}
-      HARNESS_API_TOKEN: ${HARNESS_API_TOKEN:?Set HARNESS_API_TOKEN in .env}
+      PENKO_API_TOKEN: ${PENKO_API_TOKEN:?Set PENKO_API_TOKEN in .env}
     entrypoint: ["/bin/sh", "/usr/local/bin/init-vault.sh"]
     volumes:
       - ./docker/init-vault.sh:/usr/local/bin/init-vault.sh:ro
-      - vault-token:/run/harness
+      - vault-token:/run/penko
 
-  harness:
+  penko:
     build:
       context: .
     depends_on:
@@ -48,26 +48,26 @@ services:
         condition: service_completed_successfully
     environment:
       VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN_FILE: /run/harness/vault_token
+      VAULT_TOKEN_FILE: /run/penko/vault_token
       VAULT_MOUNT_POINT: harness-secrets
-      HARNESS_MODEL: ${HARNESS_MODEL:-groq/openai/gpt-oss-120b}
-      HARNESS_WORKSPACE: /workspace        # the only directory the file/shell tools can touch
-      HARNESS_API_TOKEN: ${HARNESS_API_TOKEN:?Set HARNESS_API_TOKEN in .env}
-      HARNESS_APPROVERS: ${HARNESS_APPROVERS:-}
-      HARNESS_GITOPS_REPOS: ${HARNESS_GITOPS_REPOS:-}
-      HARNESS_STAGING_APPS: ${HARNESS_STAGING_APPS:-}
-      HARNESS_WEBHOOK_ENDPOINTS: ${HARNESS_WEBHOOK_ENDPOINTS:-}
-      HARNESS_WEBHOOK_SECRET: ${HARNESS_WEBHOOK_SECRET:-}
+      PENKO_MODEL: ${PENKO_MODEL:-groq/openai/gpt-oss-120b}
+      PENKO_WORKSPACE: /workspace        # the only directory the file/shell tools can touch
+      PENKO_API_TOKEN: ${PENKO_API_TOKEN:?Set PENKO_API_TOKEN in .env}
+      PENKO_APPROVERS: ${PENKO_APPROVERS:-}
+      PENKO_GITOPS_REPOS: ${PENKO_GITOPS_REPOS:-}
+      PENKO_STAGING_APPS: ${PENKO_STAGING_APPS:-}
+      PENKO_WEBHOOK_ENDPOINTS: ${PENKO_WEBHOOK_ENDPOINTS:-}
+      PENKO_WEBHOOK_SECRET: ${PENKO_WEBHOOK_SECRET:-}
     ports:
       - "127.0.0.1:8000:8000"   # published on the host loopback only
     volumes:
-      - vault-token:/run/harness:ro
-      - harness-data:/app/data
-      - harness-workspace:/workspace
-      # - ${HOME}/.kube:/home/harness/.kube:ro     # uncomment for Kubernetes tools
+      - vault-token:/run/penko:ro
+      - penko-data:/app/data
+      - penko-workspace:/workspace
+      # - ${HOME}/.kube:/home/penko/.kube:ro     # uncomment for Kubernetes tools
     restart: unless-stopped
 
 volumes:
   vault-token:
-  harness-data:
-  harness-workspace:
+  penko-data:
+  penko-workspace:

@@ -41,14 +41,14 @@ def test_no_hardcoded_tokens_in_tracked_sources():
 
 def test_compose_gives_the_harness_no_root_token_and_binds_loopback():
     compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
-    harness = compose["services"]["harness"]
+    harness = compose["services"]["penko"]
     env = harness["environment"]
     assert "VAULT_TOKEN" not in env and "VAULT_TOKEN_FILE" in env
     assert all("VAULT_DEV_ROOT_TOKEN_ID" not in str(v) for v in env.values())
     assert all(p.startswith("127.0.0.1:") for p in harness["ports"])
     assert "network_mode" not in harness
     assert all(p.startswith("127.0.0.1:") for p in compose["services"]["vault"]["ports"])
-    assert "HARNESS_API_TOKEN" in env
+    assert "PENKO_API_TOKEN" in env
 
 
 def test_vault_init_creates_a_read_only_policy_token():
@@ -59,7 +59,7 @@ def test_vault_init_creates_a_read_only_policy_token():
 
 def test_dockerfile_runs_the_api_as_non_root_with_all_packages():
     text = (ROOT / "Dockerfile").read_text()
-    assert "USER harness" in text and 'CMD ["penko", "serve"]' in text and "COPY cli" in text
+    assert "USER penko" in text and 'CMD ["penko", "serve"]' in text and "COPY cli" in text
     assert "HEALTHCHECK" in text
 
 
@@ -108,5 +108,5 @@ def test_ci_runs_tests_lint_and_secret_scan():
 
 
 def test_docs_are_organised():
-    assert (ROOT / "docs" / "Harness_Engine_Audit.md").is_file() and (ROOT / "docs/refs/Deepseek-harness-paper.pdf").is_file()
+    assert (ROOT / "docs" / "archive" / "audit.md").is_file() and (ROOT / "docs/refs/Deepseek-harness-paper.pdf").is_file()
     assert not (ROOT / "Deepseek-harness-paper.pdf").exists()

@@ -1,4 +1,4 @@
-"""`harness chat`: multi-turn history, slash commands, stopping a turn, resume, mode switches."""
+"""`penko chat`: multi-turn history, slash commands, stopping a turn, resume, mode switches."""
 import io
 
 import pytest
@@ -43,7 +43,7 @@ def chat(*lines, **kw):
 def test_two_turns_share_history_and_track_cost(monkeypatch):
     calls = install_llm(monkeypatch, [msg("hi there", tokens=100), msg("second answer", tokens=100)])
     c, code, out = chat("hello", "/cost", "what did I say?", "/exit")
-    assert code == 0 and "harness" in out and "hi there" in out and "second answer" in out
+    assert code == 0 and "perry" in out and "hi there" in out and "second answer" in out
     second = [m["content"] for m in calls[1]["messages"] if m["role"] in ("user", "assistant")]
     assert any("hello" in (t or "") for t in second) and "hi there" in second
     assert "100 input" not in out and "tokens," in out and "$" in out           # /cost line
@@ -51,7 +51,7 @@ def test_two_turns_share_history_and_track_cost(monkeypatch):
     s = get_session(conn, c.session_id)
     conn.close()
     assert s["status"] == "success" and s["prompt_tokens"] == 100 and s["cost_usd"] > 0
-    assert f"harness chat --resume {c.session_id}" in out
+    assert f"penko chat --resume {c.session_id}" in out
 
 
 def test_slash_commands(monkeypatch):

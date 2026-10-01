@@ -1,6 +1,6 @@
 # Implementation status (V3 roadmap)
 
-Status of every item in `docs/Harness_Engine_Audit.md` §15 and `docs/IMPLEMENTATION_PLAN_V3.md`.
+Status of every item in the audit (`docs/archive/audit.md` §15) and the phased plan (`docs/archive/implementation-plan-v3.md`).
 Tests are under `tests/`; run `pytest` (unit + integration) and `pytest -m live tests/live` (real infrastructure).
 
 ## Phase A - security and correctness
@@ -56,7 +56,7 @@ C7 persistent cron, heartbeat, list/pause/delete - done. C8 `AGENTS.md` - done.
 | Item | Status |
 |---|---|
 | `penko` command (`init`, `serve`, `run`, `doctor`, `token`, `sessions`, `approvals`, `plugins`, `version`) | Done (`cli/main.py`) |
-| Defaults packaged in the wheel; per-user config in `~/.harness` (`HARNESS_HOME`) | Done (`core/home.py`, `core/defaults/`); the old `config/` directory moved |
+| Defaults packaged in the wheel; per-user config in `~/.penko` (`PENKO_HOME`) | Done (`core/home.py`, `core/defaults/`); the old `config/` directory moved |
 | No Vault/Docker needed: mode-600 `.env` written by `penko init`, Vault optional; secrets go to the OS keyring (`core/keystore.py`, `penko secret`, `--secret-store`) with a mode-600 file fallback | Done |
 | `penko doctor` with per-check fixes and exit codes | Done (`cli/doctor.py`) |
 | One-line installer (`install.sh`: uv → pipx → private venv; git/PyPI/wheel/path sources) | Done; tested with dry runs and a real clean-venv install |
@@ -68,7 +68,7 @@ C7 persistent cron, heartbeat, list/pause/delete - done. C8 `AGENTS.md` - done.
 
 | Item | Status | Where / test |
 |---|---|---|
-| Cost accounting: per-call USD events, USD budget (`HARNESS_MAX_COST_USD`, `max_cost_usd`), `penko cost`, `GET /usage`, `GET /sessions` | Done | `core/cost.py`, `tests/test_cost.py` |
+| Cost accounting: per-call USD events, USD budget (`PENKO_MAX_COST_USD`, `max_cost_usd`), `penko cost`, `GET /usage`, `GET /sessions` | Done | `core/cost.py`, `tests/test_cost.py` |
 | Permission modes: `plan` (read-only until the plan is approved via `exit_plan_mode`), `read-only`, `strict` | Done | `core/modes.py`, `tests/test_modes.py` |
 | Headless contract: `--output-format json\|stream-json\|text`, exit codes 0/1/2/3, `--summary-file`, `--approval-timeout`; GitHub Action | Done; the action's shell step is executed in tests with a fake model | `core/headless.py`, `action.yml`, `tests/test_headless.py` |
 | `penko chat`: multi-turn REPL, inline approvals, Ctrl+C stops a turn, slash commands, resume | Done | `cli/chat.py`, `tests/test_chat.py` |
@@ -80,7 +80,7 @@ Control-by-control security mapping: `docs/OWASP_AGENTIC_MAPPING.md`.
 ## Known limits
 
 - The shell/dynamic-tool sandbox is only as strong as the backend: without `bwrap`/docker the process has the
-  container's network. Set `HARNESS_SANDBOX` and install `bubblewrap`; `HARNESS_DYNAMIC_SANDBOX=bwrap` fails closed.
+  container's network. Set `PENKO_SANDBOX` and install `bubblewrap`; `PENKO_DYNAMIC_SANDBOX=bwrap` fails closed.
 - SSRF checks resolve DNS before connecting; a DNS-rebinding race between check and connect is not pinned.
 - No cost accounting (tokens only) and no multi-channel chat gateway.
 - Docker and the live tests could not be exercised in the build environment; compose/Dockerfile are validated statically.

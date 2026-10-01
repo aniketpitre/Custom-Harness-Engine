@@ -4,9 +4,6 @@
 
 <p align="center"><code>penko chat</code> · <code>penko run</code> · <code>penko serve</code> · <code>penko dashboard</code></p>
 
-> Penko Perry was called Harness Engine. The `harness` command still works as an alias, and settings keep their
-> `HARNESS_` prefix and `~/.harness` home so existing installs carry on unchanged.
-
 Most agent frameworks optimise what an agent *can do*. Penko Perry optimises whether the agent
 *actually accomplished the goal* - safely, observably, and with a tamper-evident record - while staying
 small and fast. DevOps/SRE (Kubernetes, ArgoCD, GitOps) is the first domain pack; the core is domain-neutral.
@@ -14,6 +11,26 @@ small and fast. DevOps/SRE (Kubernetes, ArgoCD, GitOps) is the first domain pack
 ```text
 GOAL → CONTEXT → AGENT → POLICY → APPROVAL → EXECUTE → VERIFY → RECEIPT → LEARN → MEMORY
 ```
+
+## Get started
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aniketpitre/Custom-Harness-Engine/main/install.sh | sh
+penko init                 # pick a provider and model, paste a key (or point at LM Studio / Ollama / your own server)
+penko doctor --online      # checks everything and makes one tiny model call
+penko chat                 # talk to the agent in your terminal; approvals appear inline
+```
+
+Then, when you want more:
+
+```bash
+penko run "Summarise failing pods in staging" --mode read-only   # one-shot, prints a receipt
+penko serve                # API + web dashboard on http://127.0.0.1:8000/ui
+penko dashboard            # open the dashboard, already signed in
+penko cost                 # what you have spent, by model
+```
+
+Using a different model provider, or your own model server? See [Connect a model provider](#connect-a-model-provider).
 
 - [Why Penko Perry](#why-penko-perry)
 - [Feature overview](#feature-overview)
@@ -24,7 +41,7 @@ GOAL → CONTEXT → AGENT → POLICY → APPROVAL → EXECUTE → VERIFY → RE
 - [Context, memory and skills](#context-memory-and-skills)
 - [Plugins and extensibility](#plugins-and-extensibility)
 - [Comparison with other agents](#how-it-compares)
-- [Quick start](#quick-start) · [Configuration](#configuration) · [API](#api) · [Docker](#docker)
+- [Get started](#get-started) · [Connect a model provider](#connect-a-model-provider) · [Install and commands](#install-and-commands) · [Configuration](#configuration) · [API](#api) · [Docker](#docker)
 - [Testing](#testing) · [Project layout](#project-layout) · [Limitations](#known-limitations) · [Docs](#documentation)
 
 ---
@@ -76,7 +93,7 @@ user. Each point below is something the code enforces and the test suite checks 
 - Risk tiers **R0-R4**, deny-by-default, argument-aware risk functions, hard blocklist
 - Rules: `deny > ask > allow` with argument patterns (`deny:bash(git push --force*)`)
 - Taint tracking after untrusted content
-- Approval broker: live terminal prompt (in `penko serve` and `penko run` when stdin is a TTY, opt out with `HARNESS_TERMINAL_APPROVALS=off`), REST API and Telegram buttons all active at once, first answer wins, prompts asked one at a time; approver allowlist; timeout → deny
+- Approval broker: live terminal prompt (in `penko serve` and `penko run` when stdin is a TTY, opt out with `PENKO_TERMINAL_APPROVALS=off`), REST API and Telegram buttons all active at once, first answer wins, prompts asked one at a time; approver allowlist; timeout → deny
 - Workspace confinement (symlink-safe, deny list for `.ssh`, `.aws`, `.kube`, `.env`, `secrets`), engine-source write protection
 - SSRF guard on every redirect hop; secret-stripped environments for all child processes
 - Shell command classifier (read-only pipelines auto-run, mutations ask, destructive commands are blocked) with optional `bwrap`/Docker sandbox
@@ -123,7 +140,7 @@ user. Each point below is something the code enforces and the test suite checks 
 - Persistent cron (timezone-aware) and heartbeat runs (`HEARTBEAT.md`) restored on restart
 
 ### Operations
-- OpenTelemetry traces and metrics (`harness_agent_run_count`, `resolve_policy_decision_count`, tool counts)
+- OpenTelemetry traces and metrics (`penko_agent_run_count`, `resolve_policy_decision_count`, `penko_tool_call_count`)
 - Signed (HMAC-SHA256), retried webhooks; standard `logging` throughout
 - Docker: non-root, health-checked, least-privilege Vault token, loopback-only ports
 - CI: tests, `ruff`, `gitleaks`
@@ -239,7 +256,7 @@ ASK → broker: args-hash bound, approver allowlist, timeout → deny
 ### Permission modes
 
 On top of the policy table, every run has a mode (`penko run --mode`, `permission_mode` on `POST /sessions`
-or in an agent profile, or `HARNESS_PERMISSION_MODE`):
+or in an agent profile, or `PENKO_PERMISSION_MODE`):
 
 | Mode | Behaviour |
 |---|---|
@@ -259,10 +276,10 @@ There is no bypass mode: R4 stays denied and R3 always asks. Subagents inherit t
 - **Provenance:** memory written after untrusted content is stored as `external-fetched`.
 - **Scanners:** memory writes, skills, `AGENTS.md`, self-written tools and skill candidates are scanned for
   injection phrases, exfiltration commands, credentials and invisible Unicode.
-- **Child processes** never inherit `VAULT_*`, `HARNESS_*` or anything that looks like a key/token/secret.
+- **Child processes** never inherit `VAULT_*`, `PENKO_*` or anything that looks like a key/token/secret.
 
 ### Filesystem and network
-- All file tools resolve symlinks and must stay inside `HARNESS_WORKSPACE`; `.ssh`, `.aws`, `.kube`,
+- All file tools resolve symlinks and must stay inside `PENKO_WORKSPACE`; `.ssh`, `.aws`, `.kube`,
   `.gnupg`, `.docker`, `secrets`, `.env*` are denied; writes to the engine's own sources are refused.
 - `web_fetch` allows only `http(s)` without credentials, blocks loopback, private, link-local, multicast,
   reserved, IPv4-mapped and metadata addresses, re-validates every redirect, caps size, converts HTML to text.
@@ -278,11 +295,11 @@ available, a network-isolated `bwrap`. Each tool file is its own plugin; a bad f
 keep running. Agents need the `Dynamic` capability to see or call registered tools.
 
 ### API and secrets
-- No default token: without `HARNESS_API_TOKEN` (or a Vault-stored one) every protected route returns 503.
+- No default token: without `PENKO_API_TOKEN` (or a Vault-stored one) every protected route returns 503.
 - Constant-time comparison, per-token scopes (`sessions:write`, `approvals:write`, `admin` ...), sliding-window rate limit.
 - Secrets resolve from the environment, then Vault (one shared client, TTL cache); LLM keys are resolved **per
   model**, so a key for one provider is never sent to another.
-- Docker: the harness receives a read-only Vault token, never the root token or the raw provider key.
+- Docker: Penko Perry receives a read-only Vault token, never the root token or the raw provider key.
 
 ---
 
@@ -294,7 +311,7 @@ Every run appends events to one SQLite table (`WAL`, migrated once per process):
 events(id, session_id, seq, parent_id, type, payload, prev_hash, hash, created_at)
 types: user_msg · assistant_msg · tool_result · action · verification · compaction
        interrupt_queued · run_start · outcome ...
-hash = sha256(prev_hash | session | seq | type | payload)      # HMAC if HARNESS_RECEIPT_KEY is set
+hash = sha256(prev_hash | session | seq | type | payload)      # HMAC if PENKO_RECEIPT_KEY is set
 ```
 
 Everything else is derived from it:
@@ -315,7 +332,7 @@ Everything else is derived from it:
 
 - **Compaction** triggers on tokens (`window - reserve`), not message count. Order: prune large old tool
   outputs to stubs → summarise older history with a structured prompt (goal, constraints, progress, decisions,
-  tool calls, files, next steps) → keep ≥ `HARNESS_KEEP_RECENT_TOKENS` of recent history. Cuts land only on
+  tool calls, files, next steps) → keep ≥ `PENKO_KEEP_RECENT_TOKENS` of recent history. Cuts land only on
   user/assistant messages, the first user message is pinned, the summary is a user-role message, and a
   deterministic summary is used if the summariser fails. Compaction is logged as an event, so history stays replayable.
   A property test compacts 1,000 random tool-using transcripts and validates each one.
@@ -363,9 +380,9 @@ await engine.plugins.load(MyPlugin())            # transactional; same name = re
 - **Tools are data:** `ToolSpec` declares capability, argument-aware risk, `read_only`/`parallel_safe`,
   output limit, untrusted flag, snapshot pair, post-condition, timeout, and an approval rendering.
 - **Hooks:** `session_start`, `before_turn`, `pre_tool` (deny / ask / rewrite arguments), `post_tool`,
-  `pre_compact`, `post_compact`, `stop` (force continuation), `session_end`. Shell hooks via `~/.harness/config/hooks.yaml`
+  `pre_compact`, `post_compact`, `stop` (force continuation), `session_end`. Shell hooks via `~/.penko/config/hooks.yaml`
   (JSON on stdin, exit code 2 blocks). Each hook has a time budget; a failing hook is skipped.
-- **MCP:** `~/.harness/config/mcp.yaml` starts servers over stdio; tools become `mcp__<server>__<tool>`, are untrusted, R2 by
+- **MCP:** `~/.penko/config/mcp.yaml` starts servers over stdio; tools become `mcp__<server>__<tool>`, are untrusted, R2 by
   default, and R0 for names in `read_only_tools`. A server that fails to start is a `FAILED` plugin, not a crash.
 - **Subagents:** `spawn_agent` (or `SubagentSpec` in a workflow) runs a child session that can have at most the
   parent's capabilities, shares its token budget, and is bounded by depth, concurrency and time.
@@ -375,7 +392,7 @@ await engine.plugins.load(MyPlugin())            # transactional; same name = re
 ## How it compares
 
 Comparison is based on each project's public documentation at the time of writing (see
-[`docs/Harness_Engine_Audit.md`](docs/Harness_Engine_Audit.md) for sources). Where another agent is ahead, we say so.
+[`docs/archive/audit.md`](docs/archive/audit.md) for sources). Where another agent is ahead, we say so.
 
 | | Penko Perry | Claude Code | OpenClaw | Hermes Agent | Pi | DeepSeek Harness |
 |---|---|---|---|---|---|---|
@@ -405,29 +422,25 @@ above are more mature for that.
 
 ---
 
-## Quick start
+## Install and commands
 
-**One command** (installs the `penko` command in an isolated environment via `uv`, `pipx` or a private venv;
-needs Python 3.11+ or `uv`):
+**One command** installs `penko` in an isolated environment (via `uv`, else `pipx`, else a private venv; needs
+Python 3.11+ or `uv`):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/aniketpitre/Custom-Harness-Engine/main/install.sh | sh
-penko init        # ~1 minute: provider, model, API key, generates the API token, optional Telegram
-penko doctor      # checks the install and prints the exact fix for anything missing
-penko chat        # interactive session in the terminal
-penko serve       # API + web dashboard on 127.0.0.1:8000
-penko dashboard   # open the dashboard, signed in
-penko run "List the files in the workspace"
 ```
 
-Alternatives: `pipx install "harness-engine[runtime] @ git+https://github.com/aniketpitre/Custom-Harness-Engine.git"`,
-`uvx --from git+https://github.com/aniketpitre/Custom-Harness-Engine.git penko doctor`, or Docker (below).
-The installer needs no `git` (it installs the GitHub source archive) and accepts `HARNESS_SOURCE` (PyPI name, wheel,
-archive/git URL or local path) and `HARNESS_EXTRAS`.
+Alternatives: `pipx install "penko-perry[runtime] @ git+https://github.com/aniketpitre/Custom-Harness-Engine.git"`,
+`uvx --from git+https://github.com/aniketpitre/Custom-Harness-Engine.git penko doctor`, or Docker (below). The
+installer needs no `git` and accepts `PENKO_SOURCE` (PyPI name, wheel, archive/git URL or local path) and
+`PENKO_EXTRAS`.
 
-`penko init` writes everything to `~/.harness` (override with `HARNESS_HOME`): a mode-600 `.env` (provider key,
-API token, optional Telegram), `config/agents.yaml` (yours to edit) and `data/` (database, checkpoints, skills).
-No Vault, Docker or database server is required; Vault is an optional secrets provider. `penko init` keeps secrets in your OS keyring when one is available (`--secret-store auto|keyring|file`), and falls back to the mode-600 `.env` on headless machines; there is deliberately no passphrase-encrypted file, since a key stored next to the file adds no protection.
+`penko init` writes everything to `~/.penko` (override with `PENKO_HOME`): a mode-600 `.env` (settings, provider
+key, API token, optional Telegram), `config/agents.yaml` (yours to edit) and `data/` (database, checkpoints, skills).
+No Vault, Docker or database server is required. Secrets go to your OS keyring when one is available
+(`--secret-store auto|keyring|file`) and to the mode-600 `.env` on headless machines; Vault is an optional extra
+provider.
 
 | Command | Purpose |
 |---|---|
@@ -438,7 +451,7 @@ No Vault, Docker or database server is required; Vault is an optional secrets pr
 | `penko dashboard [--print-url]` | Open the web dashboard served by `penko serve`, already signed in |
 | `penko run GOAL [--agent --mode --max-cost --output-format --approval-timeout --summary-file]` | One-shot, headless-friendly run (see [Headless and CI](#headless-and-ci)); stable exit codes |
 | `penko token` | Print the API token (for `curl`) |
-| `penko theme list\|show\|set NAME` | Terminal theme: `perry` (default: the platypus in deep pale green), `helm`, `harbor`, `ember`, `forest`, `midnight`, `mono`, or your own `~/.harness/skins/NAME.yaml` |
+| `penko theme list\|show\|set NAME` | Terminal theme: `perry` (default: the platypus in deep pale green), `helm`, `harbor`, `ember`, `forest`, `midnight`, `mono`, or your own `~/.penko/skins/NAME.yaml` |
 | `penko secret list\|set NAME\|delete NAME` | Manage secrets in the OS keyring (macOS Keychain, Windows Credential Locker, Secret Service/KWallet); values are never printed |
 | `penko sessions [ID]` | Recent sessions (with cost) / one session |
 | `penko cost [--days N] [--by model\|agent\|day\|session] [--json]` | Tokens and USD spent, from the event log (subagents included) |
@@ -451,22 +464,85 @@ curl -s -H "Authorization: Bearer $(penko token)" -X POST localhost:8000/session
 ```
 
 Development checkout: `pip install -e ".[dev]"`. Optional extras: `telegram`, `vault`, `devops` (kubernetes, GitPython),
-`mcp`, `otel`, `setup`, `runtime` (all integrations).
+`mcp`, `otel`, `setup`, `keyring`, `runtime` (all integrations).
 
----
+## Connect a model provider
 
-### Local models (LM Studio, Ollama)
+Penko Perry talks to models through [LiteLLM](https://docs.litellm.ai/docs/providers), so any provider LiteLLM
+supports works. `penko init` sets up the common ones for you; everything ends up as a few lines in `~/.penko/.env`
+that you can also edit by hand.
+
+### Hosted providers
 
 ```bash
-# LM Studio: load a model with context length 16384+, start the server (Developer tab), then:
-penko init -y --provider lmstudio          # finds the loaded model, sets LM_STUDIO_API_BASE and a 16k context
-penko doctor --online
-penko chat --agent read_only_explorer --mode read-only
+penko init -y --provider groq      --api-key-env GROQ_API_KEY        # default model groq/openai/gpt-oss-120b
+penko init -y --provider anthropic --api-key-env ANTHROPIC_API_KEY   # anthropic/claude-sonnet-4-5
+penko init -y --provider openai    --api-key-env OPENAI_API_KEY      # openai/gpt-4o
 ```
 
-`--base-url http://other-mac.local:1234/v1` points at LM Studio on another machine; `--context-window` matches the
-length you loaded the model with. Local models cost $0 in `penko cost`. Small models (e.g. Qwen3 4B) work best in
-`read-only` or `plan` mode; add `/no_think` to a Qwen3 message for faster answers.
+| `--provider` | Key variable | Default model (change with `--model`) |
+|---|---|---|
+| `groq` | `GROQ_API_KEY` | `groq/openai/gpt-oss-120b` |
+| `openai` | `OPENAI_API_KEY` | `openai/gpt-4o` |
+| `anthropic` | `ANTHROPIC_API_KEY` | `anthropic/claude-sonnet-4-5` |
+| `openrouter` | `OPENROUTER_API_KEY` | `openrouter/auto` |
+| `gemini` | `GEMINI_API_KEY` | `gemini/gemini-2.5-flash` |
+| `deepseek` | `DEEPSEEK_API_KEY` | `deepseek/deepseek-chat` |
+| `mistral` | `MISTRAL_API_KEY` | `mistral/mistral-large-latest` |
+| `nvidia` | `NVIDIA_API_KEY` | `nvidia_nim/meta/llama-3.1-70b-instruct` |
+
+`--api-key-env VAR` reads the key from an environment variable (keeps it out of your shell history); without it,
+`penko init` asks for the key with hidden input.
+
+### Models on your own machine
+
+```bash
+# LM Studio: load a model (context length 16384+), start the server in the Developer tab, then
+penko init -y --provider lmstudio        # finds the loaded model, sets LM_STUDIO_API_BASE and a 16k context
+
+# Ollama: `ollama pull qwen3:4b`, then
+penko init -y --provider ollama --model ollama_chat/qwen3:4b
+```
+
+`--base-url` points at a server on another machine (`http://mac-mini.local:1234/v1` for LM Studio,
+`http://gpu-box:11434` for Ollama) and `--context-window` matches the length the model was loaded with. Local models
+cost $0 in `penko cost`. Small models (around 4B parameters) work best in `--mode read-only` or `--mode plan`; with
+Qwen3, adding `/no_think` to a message makes answers faster.
+
+### Your own server or gateway (OpenAI-compatible)
+
+vLLM, TGI, llama.cpp server, a LiteLLM proxy, Together, Fireworks or a company AI gateway: anything that speaks the
+OpenAI chat-completions API.
+
+```bash
+penko init -y --provider custom --base-url http://gpu-box:8000/v1 --model llama-3.3-70b-instruct \
+           --api-key-env MY_GATEWAY_KEY            # omit when the server needs no key
+```
+
+This writes `PENKO_MODEL=openai/llama-3.3-70b-instruct`, `OPENAI_API_BASE` and `OPENAI_API_KEY`.
+
+### Anything else LiteLLM supports
+
+Set the model string and the provider's own variables in `~/.penko/.env`, for example Azure OpenAI, AWS Bedrock
+or Vertex AI:
+
+```bash
+PENKO_MODEL=azure/my-gpt4o-deployment        # with AZURE_API_KEY, AZURE_API_BASE, AZURE_API_VERSION
+PENKO_MODEL=bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0   # with your AWS credentials
+PENKO_MODEL=vertex_ai/gemini-2.5-pro         # with Google application credentials
+```
+
+### Fallbacks, per-agent models and helpers
+
+```bash
+PENKO_FALLBACK_MODELS=anthropic/claude-sonnet-4-5,openai/gpt-4o   # tried in order if the primary fails
+PENKO_ADVISOR_MODEL=anthropic/claude-sonnet-4-5                   # the advisor_consultation tool
+PENKO_COMPACT_MODEL=groq/openai/gpt-oss-120b                     # summarises long histories
+PENKO_PRICES='{"openai/llama-3.3-70b-instruct": {"input": 0.2, "output": 0.6}}'   # USD per million tokens
+```
+
+An agent can pin its own model with `model:` in `~/.penko/config/agents.yaml`; `penko chat --model` and
+`penko run --model` override it for one session. Check any setup with `penko doctor --online`.
 
 ## Brand
 
@@ -478,34 +554,34 @@ mark and the terminal banner; regenerate the files with `python -m core.brand`.
 
 ## Configuration
 
-Precedence: real environment variables → `$HARNESS_HOME/.env` → `$HARNESS_HOME/config/settings.yaml` → packaged defaults.
-Config files are looked up in `$HARNESS_HOME/config/`, then `./config/` (checkouts), then the defaults shipped in the wheel (`core/defaults/`).
+Precedence: real environment variables → `~/.penko/.env` → `~/.penko/config/settings.yaml` → packaged defaults.
+Config files are looked up in `~/.penko/config/`, then `./config/` (checkouts), then the defaults shipped in the wheel (`core/defaults/`).
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `HARNESS_API_TOKEN` / `HARNESS_API_TOKENS` | Admin token / JSON map of scoped tokens | **required** |
-| `HARNESS_MODEL`, `HARNESS_FALLBACK_MODELS` | LiteLLM model and failover chain | `groq/openai/gpt-oss-120b` |
-| `HARNESS_WORKSPACE` | Only directory file/shell tools may touch | working directory |
-| `HARNESS_APPROVERS` | Allowed approvers (`telegram:123,api:*`) | any member of the approval chat |
-| `HARNESS_APPROVAL_TIMEOUT` | Seconds until unanswered approvals are denied | `300` |
-| `HARNESS_GITOPS_REPOS` | Repos the agent may open PRs against | the workspace |
-| `HARNESS_STAGING_APPS` | ArgoCD app globs treated as staging (R2); others are R3 | none |
-| `HARNESS_SANDBOX` | `none` / `bwrap` / `docker` for `bash` | `none` |
-| `HARNESS_TOKEN_BUDGET`, `HARNESS_MAX_TURNS`, `HARNESS_MAX_SECONDS` | Run limits | `200000` / `30` / `3600` |
-| `HARNESS_PERMISSION_MODE` | Default permission mode: `default`, `plan`, `read-only`, `strict` | `default` |
-| `HARNESS_MAX_COST_USD` | USD ceiling per run, subagents included (also `max_cost_usd` per agent, `penko run --max-cost`); `0` = no limit | `0` |
-| `HARNESS_PRICES` | Price overrides, USD per million tokens: `{"my/model": {"input": 0.5, "output": 1.5}}`. Local models are free; models without a price are reported as *unpriced* | LiteLLM's bundled map |
-| `HARNESS_CONTEXT_WINDOW`, `HARNESS_RESERVE_TOKENS`, `HARNESS_KEEP_RECENT_TOKENS` | Compaction | `128000` / `16384` / `20000` |
-| `HARNESS_LLM_TIMEOUT`, `HARNESS_LLM_RETRIES`, `HARNESS_STREAM` | Model calls | `120` / `3` / `true` |
-| `HARNESS_MAX_PARALLEL_TOOLS`, `HARNESS_TOOL_TIMEOUT`, `HARNESS_TOOL_OUTPUT_LIMIT` | Tool execution | `6` / `120` / `8000` |
-| `HARNESS_RECEIPT_KEY` | HMAC key for the event-log chain | unset |
-| `HARNESS_WEBHOOK_ENDPOINTS`, `HARNESS_WEBHOOK_SECRET` | Signed completion webhooks | none |
-| `HARNESS_MEMORY_LIMIT_CHARS`, `HARNESS_MEMORY_FLUSH` | Curated memory size, flush before compaction | `2200` / `true` |
-| `HARNESS_HOME` | Home for `.env`, config and data | `~/.harness` |
-| `HARNESS_DB_PATH`, `HARNESS_DATA_DIR` | SQLite location, data directory | `$HARNESS_HOME/data/memory.db`, `$HARNESS_HOME/data/` |
+| `PENKO_API_TOKEN` / `PENKO_API_TOKENS` | Admin token / JSON map of scoped tokens | **required** |
+| `PENKO_MODEL`, `PENKO_FALLBACK_MODELS` | LiteLLM model and failover chain | `groq/openai/gpt-oss-120b` |
+| `PENKO_WORKSPACE` | Only directory file/shell tools may touch | working directory |
+| `PENKO_APPROVERS` | Allowed approvers (`telegram:123,api:*`) | any member of the approval chat |
+| `PENKO_APPROVAL_TIMEOUT` | Seconds until unanswered approvals are denied | `300` |
+| `PENKO_GITOPS_REPOS` | Repos the agent may open PRs against | the workspace |
+| `PENKO_STAGING_APPS` | ArgoCD app globs treated as staging (R2); others are R3 | none |
+| `PENKO_SANDBOX` | `none` / `bwrap` / `docker` for `bash` | `none` |
+| `PENKO_TOKEN_BUDGET`, `PENKO_MAX_TURNS`, `PENKO_MAX_SECONDS` | Run limits | `200000` / `30` / `3600` |
+| `PENKO_PERMISSION_MODE` | Default permission mode: `default`, `plan`, `read-only`, `strict` | `default` |
+| `PENKO_MAX_COST_USD` | USD ceiling per run, subagents included (also `max_cost_usd` per agent, `penko run --max-cost`); `0` = no limit | `0` |
+| `PENKO_PRICES` | Price overrides, USD per million tokens: `{"my/model": {"input": 0.5, "output": 1.5}}`. Local models are free; models without a price are reported as *unpriced* | LiteLLM's bundled map |
+| `PENKO_CONTEXT_WINDOW`, `PENKO_RESERVE_TOKENS`, `PENKO_KEEP_RECENT_TOKENS` | Compaction | `128000` / `16384` / `20000` |
+| `PENKO_LLM_TIMEOUT`, `PENKO_LLM_RETRIES`, `PENKO_STREAM` | Model calls | `120` / `3` / `true` |
+| `PENKO_MAX_PARALLEL_TOOLS`, `PENKO_TOOL_TIMEOUT`, `PENKO_TOOL_OUTPUT_LIMIT` | Tool execution | `6` / `120` / `8000` |
+| `PENKO_RECEIPT_KEY` | HMAC key for the event-log chain | unset |
+| `PENKO_WEBHOOK_ENDPOINTS`, `PENKO_WEBHOOK_SECRET` | Signed completion webhooks | none |
+| `PENKO_MEMORY_LIMIT_CHARS`, `PENKO_MEMORY_FLUSH` | Curated memory size, flush before compaction | `2200` / `true` |
+| `PENKO_HOME` | Home for `.env`, config and data | `~/.penko` |
+| `PENKO_DB_PATH`, `PENKO_DATA_DIR` | SQLite location, data directory | `~/.penko/data/memory.db`, `~/.penko/data/` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Enable tracing | unset |
 
-Agents are declared in `~/.harness/config/agents.yaml` (created by `penko init`):
+Agents are declared in `~/.penko/config/agents.yaml` (created by `penko init`):
 
 ```yaml
 - id: sre
@@ -561,7 +637,7 @@ The CLI wears the Penko Perry look: the pixel platypus in deep pale green (theme
 a skin with `penko theme set ember` (on-call orange) or `helm` (the original blue ship's wheel) or write your own YAML that extends one:
 
 ```yaml
-# ~/.harness/skins/acme.yaml
+# ~/.penko/skins/acme.yaml
 extends: harbor
 tagline: acme platform team
 colors: {brand: magenta}
@@ -569,7 +645,7 @@ glyphs: {mascot: "🐝"}
 ```
 
 Styling shows only on an interactive terminal; piped output, `--json` and receipts stay plain. `NO_COLOR`,
-`HARNESS_ASCII=1` (no emoji) and `HARNESS_PLAIN=1` are honoured.
+`PENKO_ASCII=1` (no emoji) and `PENKO_PLAIN=1` are honoured.
 
 ## Web dashboard
 
@@ -615,7 +691,7 @@ Exit codes are stable: `0` success, `1` failure (error, loop guard, cancelled, v
 
 The repository is also a GitHub Action (`action.yml`). It defaults to `read-only` mode, a $1 cap and no waiting for
 approvals, writes the job summary, and exposes `status`, `outcome`, `exit-code`, `cost-usd`, `session-id` and
-`result-file`. A complete PR-review workflow is in [`docs/examples/harness-pr-review.yml`](docs/examples/harness-pr-review.yml).
+`result-file`. A complete PR-review workflow is in [`docs/examples/penko-pr-review.yml`](docs/examples/penko-pr-review.yml).
 
 ```yaml
 - uses: aniketpitre/Custom-Harness-Engine@v0.3.0   # pin a tag or SHA
@@ -629,8 +705,8 @@ approvals, writes the job summary, and exposes `status`, `outcome`, `exit-code`,
 
 ## Docker
 
-`./start.sh` (or `docker compose up --build`) starts a dev Vault, seeds it, mints a **read-only** token for the
-harness, and runs the API on `127.0.0.1:8000` as a non-root user with a separate `/workspace` volume. See
+`./start.sh` (or `docker compose up --build`) starts a dev Vault, seeds it, mints a **read-only** token for
+Penko Perry, and runs the API on `127.0.0.1:8000` as a non-root user with a separate `/workspace` volume. See
 [`DOCKER.md`](DOCKER.md). Vault dev mode is not persistent and not for production.
 
 ---
@@ -683,7 +759,7 @@ tests/                unit, integration and live tests
 ## Known limitations
 
 - Shell and self-written-tool sandboxing is only as strong as the backend: without `bwrap` or Docker the process
-  keeps the host network. Set `HARNESS_SANDBOX`; `HARNESS_DYNAMIC_SANDBOX=bwrap` fails closed.
+  keeps the host network. Set `PENKO_SANDBOX`; `PENKO_DYNAMIC_SANDBOX=bwrap` fails closed.
 - SSRF validation resolves DNS before connecting; DNS-rebinding between check and connect is not pinned.
 - Token accounting only (no cost accounting); no multi-channel chat gateway; no TUI/IDE integration.
 - No file watcher for plugins (use `POST /admin/reload`); subagents have no worktree isolation.
@@ -691,11 +767,8 @@ tests/                unit, integration and live tests
 
 ## Documentation
 
-- [`docs/ROADMAP.md`](docs/ROADMAP.md): what is left compared with other agents, with sources and a prioritised plan
+- [`GUIDE.md`](GUIDE.md): user guide · [`DOCKER.md`](DOCKER.md): deployment
+- [`docs/ROADMAP.md`](docs/ROADMAP.md): what is next, compared with other agents, with sources
+- [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md): every audit finding and how it was addressed
 - [`docs/OWASP_AGENTIC_MAPPING.md`](docs/OWASP_AGENTIC_MAPPING.md): security controls mapped to the OWASP agentic risks
-
-
-- [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) - every audit finding and how it was addressed
-- [`docs/Harness_Engine_Audit.md`](docs/Harness_Engine_Audit.md) - the full audit and comparison research
-- [`docs/IMPLEMENTATION_PLAN_V3.md`](docs/IMPLEMENTATION_PLAN_V3.md), [`docs/general_purpose_agent_harness_architecture.md`](docs/general_purpose_agent_harness_architecture.md) - architecture background
-- [`GUIDE.md`](GUIDE.md) - user guide · [`DOCKER.md`](DOCKER.md) - deployment
+- [`docs/archive/`](docs/archive/README.md): the design audit, research and plans behind the architecture

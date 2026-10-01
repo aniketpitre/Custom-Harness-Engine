@@ -36,7 +36,7 @@ def setup() -> None:
             path="telegram", secret=dict(bot_token=bot, approval_chat_id=chat), mount_point=mount)
 
     print("\nSecrets saved to Vault.")
-    print(f"Set HARNESS_MODEL={model}")
+    print(f"Set PENKO_MODEL={model}")
     print("The API token was stored at harness-secrets/harness (read it with `vault kv get`).")
     print("Start the API with: python main.py")
 

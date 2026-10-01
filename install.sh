@@ -1,13 +1,13 @@
 #!/bin/sh
 # One-command installer for Penko Perry.
 #   curl -fsSL https://raw.githubusercontent.com/aniketpitre/Custom-Harness-Engine/main/install.sh | sh
-# Installs the `penko` command (and its alias `harness`) in an isolated environment (uv, else pipx, else a private venv).
-# Override the source with HARNESS_SOURCE (a PyPI name, wheel, archive/git URL, or local path). HARNESS_EXTRAS picks extras.
+# Installs the `penko` command in an isolated environment (uv, else pipx, else a private venv).
+# Override the source with PENKO_SOURCE (a PyPI name, wheel, archive/git URL, or local path). PENKO_EXTRAS picks extras.
 set -eu
 
 # Default: the GitHub source archive (no git needed). Until a PyPI release exists this is the way to install.
-SOURCE="${HARNESS_SOURCE:-https://github.com/aniketpitre/Custom-Harness-Engine/archive/refs/heads/main.tar.gz}"
-EXTRAS="${HARNESS_EXTRAS-runtime,keyring}"
+SOURCE="${PENKO_SOURCE:-${HARNESS_SOURCE:-https://github.com/aniketpitre/Custom-Harness-Engine/archive/refs/heads/main.tar.gz}}"
+EXTRAS="${PENKO_EXTRAS-${HARNESS_EXTRAS-runtime,keyring}}"
 if [ -n "$EXTRAS" ]; then BRACKET="[$EXTRAS]"; else BRACKET=""; fi
 case "$SOURCE" in
   git+*|http*) SPEC="penko-perry$BRACKET @ $SOURCE" ;;
@@ -31,15 +31,15 @@ if have uv; then
 elif have pipx && [ -n "$PYTHON" ]; then
   CMD="pipx install --force --python $PYTHON \"$SPEC\""
 elif [ -n "$PYTHON" ]; then
-  VENV="${HARNESS_VENV:-$HOME/.harness/venv}"
-  CMD="$PYTHON -m venv \"$VENV\" && \"$VENV/bin/pip\" install --upgrade pip && \"$VENV/bin/pip\" install \"$SPEC\" && mkdir -p \"$HOME/.local/bin\" && ln -sf \"$VENV/bin/penko\" \"$HOME/.local/bin/penko\" && ln -sf \"$VENV/bin/harness\" \"$HOME/.local/bin/harness\""
+  VENV="${PENKO_VENV:-$HOME/.penko/venv}"
+  CMD="$PYTHON -m venv \"$VENV\" && \"$VENV/bin/pip\" install --upgrade pip && \"$VENV/bin/pip\" install \"$SPEC\" && mkdir -p \"$HOME/.local/bin\" && ln -sf \"$VENV/bin/penko\" \"$HOME/.local/bin/penko\""
 else
   say "Penko Perry needs Python 3.11+ (or 'uv', which can fetch one)."
   say "Install uv:  curl -LsSf https://astral.sh/uv/install.sh | sh   then re-run this script."
   exit 1
 fi
 
-if [ "${HARNESS_INSTALL_DRY_RUN:-0}" = "1" ]; then
+if [ "${PENKO_INSTALL_DRY_RUN:-${HARNESS_INSTALL_DRY_RUN:-0}}" = "1" ]; then
   say "$CMD"
   exit 0
 fi

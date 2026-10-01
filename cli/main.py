@@ -19,9 +19,14 @@ PROVIDERS = {
     "anthropic": ("ANTHROPIC_API_KEY", "anthropic/claude-sonnet-4-5"),
     "openrouter": ("OPENROUTER_API_KEY", "openrouter/auto"),
     "nvidia": ("NVIDIA_API_KEY", "nvidia_nim/meta/llama-3.1-70b-instruct"),
+    "gemini": ("GEMINI_API_KEY", "gemini/gemini-2.5-flash"),
+    "deepseek": ("DEEPSEEK_API_KEY", "deepseek/deepseek-chat"),
+    "mistral": ("MISTRAL_API_KEY", "mistral/mistral-large-latest"),
     "lmstudio": ("", "lm_studio/qwen/qwen3-4b"),
-    "local": ("", "ollama_chat/llama3.1"),
+    "ollama": ("", "ollama_chat/qwen3:4b"),
+    "custom": ("", "openai/your-model"),    # any OpenAI-compatible endpoint: vLLM, TGI, LiteLLM proxy, a gateway
 }
+PROVIDER_ALIASES = {"local": "ollama", "lm-studio": "lmstudio", "openai-compatible": "custom"}
 LMSTUDIO_URL = "http://localhost:1234/v1"
 
 
@@ -49,6 +54,7 @@ def cmd_init(args) -> int:
     home = ensure_home()
     interactive = not args.yes and sys.stdin.isatty()
     provider = (args.provider or (_ask("LLM provider (" + "/".join(PROVIDERS) + ")", "groq") if interactive else "groq")).lower()
+    provider = PROVIDER_ALIASES.get(provider, provider)
     if provider not in PROVIDERS:
         print(f"Unknown provider {provider!r}; choose from: {', '.join(PROVIDERS)}", file=sys.stderr)
         return 2
@@ -66,7 +72,19 @@ def cmd_init(args) -> int:
         # small local models: a context that fits a 16k window, and a little more time per call
         extra = {"LM_STUDIO_API_BASE": base, "HARNESS_CONTEXT_WINDOW": str(args.context_window or 16384),
                  "HARNESS_RESERVE_TOKENS": "2048", "HARNESS_KEEP_RECENT_TOKENS": "6000", "HARNESS_LLM_TIMEOUT": "300"}
+    if provider == "custom":
+        base = args.base_url or (_ask("Base URL of the OpenAI-compatible API (e.g. http://gpu-box:8000/v1)") if interactive else "")
+        if not base:
+            print("--provider custom needs --base-url (an OpenAI-compatible /v1 endpoint)", file=sys.stderr)
+            return 2
+        extra = {"OPENAI_API_BASE": base}
+        if args.context_window:
+            extra["HARNESS_CONTEXT_WINDOW"] = str(args.context_window)
+    if provider == "ollama" and args.base_url:
+        extra = {"OLLAMA_API_BASE": args.base_url}
     model = args.model or (_ask("Model", default_model) if interactive else default_model)
+    if provider == "custom" and "/" not in model.split(":")[0]:
+        model = f"openai/{model}"          # LiteLLM speaks the OpenAI protocol to the base URL
 
     values: dict[str, str] = {"HARNESS_MODEL": model, **extra}
     api_key = args.api_key or (os.environ.get(args.api_key_env) if args.api_key_env else None)
@@ -76,8 +94,8 @@ def cmd_init(args) -> int:
         values[key_var] = api_key
     elif key_var and not os.environ.get(key_var):
         print(f"note: no {provider} API key provided; add {key_var}=... to {env_file()} before running.", file=sys.stderr)
-    if provider == "local" and args.base_url:
-        values["OPENAI_API_BASE"] = args.base_url
+    if provider == "custom":   # the endpoint may not need a key, but the OpenAI client requires one
+        values["OPENAI_API_KEY"] = api_key or os.environ.get("OPENAI_API_KEY") or "not-needed"
 
     token_existing = os.environ.get("HARNESS_API_TOKEN")
     values["HARNESS_API_TOKEN"] = token_existing or pysecrets.token_hex(32)
@@ -124,16 +142,16 @@ def cmd_init(args) -> int:
 
 
 def cmd_secret(args) -> int:
-    """harness secret list|set NAME|delete NAME - manage individual secrets (e.g. rotate a provider key)."""
+    """penko secret list|set NAME|delete NAME - manage individual secrets (e.g. rotate a provider key)."""
     from core import keystore
-    from core.home import _read_env_file, delete_secret, keyring_items
+    from core.home import _read_env_file, delete_secret, internal_name, keyring_items, public_name
 
     load_env()
     file_values = _read_env_file()
     in_keyring = set(keyring_items(file_values))
     if args.action == "list":
         for name in sorted(in_keyring | {k for k in file_values if keystore.is_secret_name(k) and k != keystore.ITEMS_VAR}):
-            print(f"{name:<45} {'keyring' if name in in_keyring else 'file (.env)'}")
+            print(f"{public_name(name):<45} {'keyring' if name in in_keyring else 'file (.env)'}")
         return 0
     if not args.name:
         print("secret name required", file=sys.stderr)
@@ -144,14 +162,15 @@ def cmd_secret(args) -> int:
             return 0
         print("not found", file=sys.stderr)
         return 1
+    name = internal_name(args.name)
     value = os.environ.get(args.from_env, "") if args.from_env else getpass.getpass(f"{args.name} (hidden): ")
     if not value:
         print("empty value", file=sys.stderr)
         return 2
     # keep a secret where the installation already keeps its secrets
     use_keyring = bool(in_keyring) and keystore.available()
-    write_env({args.name: value}, store="keyring" if use_keyring else "file")
-    os.environ[args.name] = value
+    write_env({name: value}, store="keyring" if use_keyring else "file")
+    os.environ[name] = value
     print(f"{args.name} stored in {'the OS keyring' if use_keyring else str(env_file())}")
     return 0
 
@@ -174,7 +193,7 @@ def cmd_serve(args) -> int:
     st = settings()
     host, port = args.host or st.api_host, args.port or st.api_port
     if not st.api_tokens:
-        print("HARNESS_API_TOKEN is not set: the API would reject every request. Run `penko init`.", file=sys.stderr)
+        print("PENKO_API_TOKEN is not set: the API would reject every request. Run `penko init`.", file=sys.stderr)
         return 1
     if host not in {"127.0.0.1", "localhost", "::1"}:
         print(f"warning: binding to {host}; make sure the API is not reachable by untrusted networks.", file=sys.stderr)
@@ -358,7 +377,7 @@ def cmd_cost(args) -> int:
     total = sum(r["cost_usd"] for r in rows)
     unpriced = sum(r["unpriced_calls"] for r in rows)
     print(f"\n{theme.glyph('receipt')} total {fmt(total)} over {args.days} day(s)".replace("  ", " ")
-          + (f"; {unpriced} call(s) have no known price (set HARNESS_PRICES)" if unpriced else ""))
+          + (f"; {unpriced} call(s) have no known price (set PENKO_PRICES)" if unpriced else ""))
     return 0
 
 
@@ -451,12 +470,14 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command")
 
     i = sub.add_parser("init", help="first-run setup (model, key, API token, approvals)")
-    i.add_argument("--provider", choices=list(PROVIDERS))
+    i.add_argument("--provider", choices=list(PROVIDERS) + list(PROVIDER_ALIASES),
+                   help="hosted: groq, openai, anthropic, openrouter, nvidia, gemini, deepseek, mistral; "
+                        "self-hosted: lmstudio, ollama, custom (any OpenAI-compatible URL)")
     i.add_argument("--model")
     i.add_argument("--api-key", help="prefer --api-key-env: command lines end up in shell history")
     i.add_argument("--api-key-env", metavar="VAR", help="read the provider key from this environment variable")
-    i.add_argument("--base-url", help="server URL for --provider local or lmstudio (LM Studio default: "
-                   "http://localhost:1234/v1)")
+    i.add_argument("--base-url", help="server URL for lmstudio (default http://localhost:1234/v1), ollama "
+                   "(default http://localhost:11434) or custom (required, an OpenAI-compatible /v1 URL)")
     i.add_argument("--context-window", type=int, help="context length the model was loaded with (lmstudio: 16384)")
     i.add_argument("--telegram-bot-token")
     i.add_argument("--telegram-bot-token-env", metavar="VAR")
@@ -483,7 +504,7 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--summary-file", metavar="PATH", help="append a Markdown summary (e.g. $GITHUB_STEP_SUMMARY)")
     r.add_argument("--approval-timeout", type=float, metavar="SECONDS",
                    help="how long to wait for a human; 0 denies anything that needs approval (CI)")
-    r.add_argument("--model", help="override HARNESS_MODEL for this run")
+    r.add_argument("--model", help="override PENKO_MODEL for this run")
     r.add_argument("--agent", default="devops_agent")
     r.add_argument("--verify-file", nargs=2, metavar=("PATH", "EXPECTED"))
     r.add_argument("--max-cost", type=float, metavar="USD", help="stop the run once it has spent this much")

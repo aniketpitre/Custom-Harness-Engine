@@ -3,10 +3,10 @@
 Styling only ever appears on an interactive terminal. Piped or redirected output, `--json`, and anything a
 script might parse stay plain, so receipts and the doctor JSON never contain escape codes. Built-in skins
 live here (the default is `perry`, the Penko Perry platypus in deep pale green); drop a YAML file in
-`$HARNESS_HOME/skins/<name>.yaml` to add your own (it inherits every key you leave out from `perry`). Choose one with `penko theme set NAME` or `HARNESS_THEME=NAME`.
+`~/.penko/skins/<name>.yaml` to add your own (it inherits every key you leave out from `perry`). Choose one with `penko theme set NAME` or `PENKO_THEME=NAME`.
 
-Environment: NO_COLOR disables colour, HARNESS_COLOR=always|never|auto, HARNESS_ASCII=1 disables emoji,
-HARNESS_PLAIN=1 disables all styling.
+Environment: NO_COLOR disables colour, PENKO_COLOR=always|never|auto, PENKO_ASCII=1 disables emoji,
+PENKO_PLAIN=1 disables all styling.
 """
 from __future__ import annotations
 
@@ -174,7 +174,7 @@ def paint(text: str, role: str, stream=None, skin: Skin | None = None) -> str:
 
 
 def glyph(name: str, stream=None) -> str:
-    """The themed glyph on a UTF-8 terminal, an ASCII fallback with HARNESS_ASCII, the classic mark when piped."""
+    """The themed glyph on a UTF-8 terminal, an ASCII fallback with PENKO_ASCII, the classic mark when piped."""
     if use_emoji(stream):
         return current().glyphs.get(name, "")
     if styled(stream) and os.environ.get("HARNESS_ASCII"):

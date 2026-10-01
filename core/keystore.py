@@ -1,8 +1,8 @@
-"""Secret storage for `harness init`: the OS keyring when one is available, else a mode-600 file.
+"""Secret storage for `penko init`: the OS keyring when one is available, else a mode-600 file.
 
 Secrets are the provider API keys, the API token, Telegram credentials and signing keys. With the keyring
 store they are kept in the OS keychain (macOS Keychain, Windows Credential Locker, Secret Service/KWallet);
-`$HARNESS_HOME/.env` then holds only non-secret settings plus `HARNESS_KEYRING_ITEMS`, the names to fetch.
+`~/.penko/.env` then holds only non-secret settings plus `PENKO_KEYRING_ITEMS`, the names to fetch.
 There is deliberately no passphrase-encrypted file: it would have to be unlocked on every start, which
 defeats a zero-config daemon. Headless machines (no keyring backend) use the mode-600 file.
 """

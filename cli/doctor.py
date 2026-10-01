@@ -48,7 +48,7 @@ def _secret_store_checks() -> list[Check]:
         missing = [n for n in items if keystore.get(n) is None]
         if missing:
             return [Check("secret store", FAIL, f"missing from the keyring: {', '.join(missing)}",
-                          "; ".join(f"harness secret set {n}" for n in missing))]
+                          "; ".join(f"penko secret set {n}" for n in missing))]
         return [Check("secret store", OK, f"OS keyring ({keystore.backend_name()}), {len(items)} secret(s)")]
     loose = [k for k in values if keystore.is_secret_name(k)]
     if loose and keystore.available():
@@ -82,8 +82,8 @@ def collect(online: bool = False, port: int | None = None) -> list[Check]:
 
     checks.extend(_secret_store_checks())
     checks.append(Check("api token", OK if st.api_tokens else FAIL,
-                        "configured" if st.api_tokens else "HARNESS_API_TOKEN is not set (API refuses all requests)",
-                        "" if st.api_tokens else "run `penko init` (or export HARNESS_API_TOKEN=$(openssl rand -hex 32))"))
+                        "configured" if st.api_tokens else "PENKO_API_TOKEN is not set (API refuses all requests)",
+                        "" if st.api_tokens else "run `penko init` (or export PENKO_API_TOKEN=$(openssl rand -hex 32))"))
     checks.append(Check("model", OK, st.model + (f" (fallbacks: {', '.join(st.fallback_models)})" if st.fallback_models else "")))
     key = get_llm_key(st.model)
     from core.cost import is_local
@@ -111,21 +111,21 @@ def collect(online: bool = False, port: int | None = None) -> list[Check]:
         conn.close()
         checks.append(Check("database", OK, f"{st.db_path} (journal_mode={mode})"))
     except Exception as error:  # noqa: BLE001
-        checks.append(Check("database", FAIL, str(error), "check permissions on HARNESS_HOME/data"))
+        checks.append(Check("database", FAIL, str(error), "check permissions on ~/.penko/data"))
 
     checks.append(_binary("git", "GitOps pull requests"))
     checks.append(_binary("gh", "opening pull requests (GitOps)"))
     checks.append(_binary("kubectl", "diagnosing Kubernetes (optional)"))
     checks.append(_binary("argocd", "ArgoCD tools"))
     if st.sandbox == "bwrap":
-        checks.append(_binary("bwrap", "HARNESS_SANDBOX=bwrap (fails closed without it)", FAIL))
+        checks.append(_binary("bwrap", "PENKO_SANDBOX=bwrap (fails closed without it)", FAIL))
     elif st.sandbox == "docker":
-        checks.append(_binary("docker", "HARNESS_SANDBOX=docker (fails closed without it)", FAIL))
+        checks.append(_binary("docker", "PENKO_SANDBOX=docker (fails closed without it)", FAIL))
     else:
         bwrap = shutil.which("bwrap")
         checks.append(Check("sandbox", OK if bwrap else WARN,
                             "bwrap available" if bwrap else "shell tool runs without a sandbox",
-                            "" if bwrap else "install bubblewrap and set HARNESS_SANDBOX=bwrap for a network-isolated shell"))
+                            "" if bwrap else "install bubblewrap and set PENKO_SANDBOX=bwrap for a network-isolated shell"))
 
     checks.append(_module("telegram", "telegram", "Telegram approvals"))
     checks.append(_module("kubernetes", "devops", "Kubernetes tools"))

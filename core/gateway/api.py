@@ -36,7 +36,7 @@ from core.secrets import get_secret
 from core.settings import settings
 from core.skills import discover_skills
 
-load_env()  # $HARNESS_HOME/.env written by `harness init` (real env vars win)
+load_env()  # ~/.penko/.env written by `penko init` (real env vars win)
 security = HTTPBearer(auto_error=False)
 registry = AgentRegistry()
 engine = get_engine()
@@ -68,7 +68,7 @@ def authenticate(credentials: HTTPAuthorizationCredentials | None = Depends(secu
         raise HTTPException(status_code=401, detail="Not authenticated")
     tokens = _configured_tokens()
     if not tokens:  # fail closed: there is no default token
-        raise HTTPException(status_code=503, detail="API token is not configured (set HARNESS_API_TOKEN)")
+        raise HTTPException(status_code=503, detail="API token is not configured (set PENKO_API_TOKEN)")
     supplied = credentials.credentials.encode()
     match = None
     for token, scopes in tokens.items():
@@ -109,7 +109,7 @@ async def lifespan(app: FastAPI):
     runs.recover()
     start_scheduler(runs)
     _telegram = start_telegram(engine.broker)
-    terminal = terminal_channel(engine.broker)      # live prompt when `harness serve` runs in a terminal
+    terminal = terminal_channel(engine.broker)      # live prompt when `penko serve` runs in a terminal
     yield
     if terminal:
         terminal()
